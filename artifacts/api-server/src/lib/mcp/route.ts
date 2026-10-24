@@ -48,7 +48,9 @@ const mcpApp = createMcpExpressApp({
 });
 
 const handler = toNodeHandler(
-  createMcpHandler(() => createMcpServer()),
+  createMcpHandler(() => createMcpServer(), {
+    onerror: () => logger.warn({ category: "mcp_protocol" }, "MCP protocol request rejected"),
+  }),
   {
     maxRequestBodySize: 32 * 1024,
     onerror: () => logger.error({ category: "mcp_adapter" }, "MCP request failed"),
@@ -56,7 +58,8 @@ const handler = toNodeHandler(
 );
 
 function recognizedToolNames(body: unknown): string[] {
-  const messages = Array.isArray(body) ? body : [body];
+  // Modern MCP does not support JSON-RPC batches. Leave their rejection to the SDK.
+  const messages = Array.isArray(body) ? [] : [body];
   const names: string[] = [];
   for (const value of messages) {
     if (!value || typeof value !== "object") continue;
@@ -85,6 +88,12 @@ function addAttempt(
 
 async function handleMcpRequest(req: Request, res: Response): Promise<void> {
   const controller = new AbortController();
+  const deadline = setTimeout(
+    () => controller.abort(new Error("tool_deadline_exceeded")),
+    30_000,
+  );
+  res.once("finish", () => clearTimeout(deadline));
+  res.once("close", () => clearTimeout(deadline));
   const abortIfDisconnected = () => {
     if (!res.writableEnded) {
       controller.abort(new Error("client_disconnected"));

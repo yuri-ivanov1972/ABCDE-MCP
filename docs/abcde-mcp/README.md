@@ -47,6 +47,7 @@ The upstream base is `https://abcde.lv/api`; relative paths are resolved below `
 - A list response is `{ products, totalCount }`; a normal product-detail response is the product itself.
 - Product identity is the pair `(store, productId)`.
 - Product `name` is returned as `original_name` without translation.
+- Text search returns compact nutrition summaries. Use `get_product` for full ingredient and nutrition detail.
 - `nutrition.protein`, `carbsSugars`, `fatTotal`, `salt`, `energyKcal`, `energyKj`, `carbsTotal`, `fatSaturated`, `fiber`, `nutriScoreGrade`, and `ingredientsText` map to normalized output fields.
 - `quantityValue` and `quantityUnit` describe the package; `category.nameLv/nameEn`, `nutrition.dataSourceDate`, `ingredientCard`, and `novaScore` are passed through where available.
 - A retailer URL uses `externalUrl`, with `rimiUrl` as a Rimi-only fallback. Photos prefer the primary entry and then the first usable photo.
@@ -98,6 +99,7 @@ Shopping-list suggestions are not medical advice. Ingredient data and analysis d
 - Database-backed shared limits: 60 upstream request starts/minute and 120 MCP tool attempts/minute across instances.
 - Upstream GET timeout is 10 seconds per attempt; one retry is allowed for eligible transient failures within a 30-second tool deadline. A `429` retry uses `Retry-After` only when it fits the deadline.
 - Upstream response bodies are capped at 2 MiB; MCP request bodies are capped at 32 KiB; search and basket sizes are bounded by tool schemas.
+- Structured tool results are capped at 256 KiB; larger results fail explicitly rather than returning a truncated or misleading payload.
 - Only fixed HTTPS upstream configuration is accepted; redirects and caller-supplied upstream hosts are rejected.
 - Non-JSON responses, invalid shapes, network failures, timeouts, `404`, `429`, and `5xx` are explicit errors or partial results, never fabricated catalogue data.
 - Host and Origin validation is provided by the official MCP Express SDK and configured for the known Replit/public hosts plus Claude's origins. Requests without an Origin header are accepted for non-browser clients.
@@ -119,3 +121,10 @@ The project owner should verify a real Claude conversation after connecting. The
 ## Verification
 
 The unit suite covers strict numeric parsing, zero/null behavior, store-qualified IDs, query mapping, local filter enforcement, duplicate basket references, mass conversions, missing products, and the 113.01 g calculation. Live upstream and official MCP client checks should be rerun as part of release readiness. A `200` from `/mcp` alone is not an MCP compatibility check.
+
+```sh
+pnpm --filter @workspace/api-server run test
+pnpm --filter @workspace/api-server run test:protocol -- https://YOUR-ACTUAL-PUBLISHED-HOST/mcp
+```
+
+The protocol-check script uses the official MCP client package, validates both legacy initialization and modern version negotiation, calls all three tools against real data, checks partial/error cases, and verifies aggregate counter changes. Never put the placeholder URL above on the landing page.

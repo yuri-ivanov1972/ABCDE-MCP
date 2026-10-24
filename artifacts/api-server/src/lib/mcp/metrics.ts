@@ -19,7 +19,7 @@ function minuteStart(now = Date.now()): Date {
 }
 
 async function cleanupBounded(now: Date): Promise<void> {
-  const minuteCutoff = new Date(now.getTime() - 60 * 60 * 1000);
+  const minuteCutoff = new Date(now.getTime() - 30 * 60 * 1000);
 
   await pool.query(
     `DELETE FROM mcp_global_rate_limits
@@ -32,6 +32,10 @@ async function cleanupBounded(now: Date): Promise<void> {
 }
 
 let cleanupCounter = 0;
+const cleanupTimer = setInterval(() => {
+  void cleanupBounded(new Date()).catch(() => undefined);
+}, 60_000);
+cleanupTimer.unref();
 
 export async function recordToolAttempt(): Promise<ToolAttemptResult> {
   const now = new Date();
@@ -110,7 +114,7 @@ export async function getPublicStats(): Promise<PublicStats> {
 
 export async function checkMetricsStorage(): Promise<boolean> {
   try {
-    await pool.query("SELECT 1");
+    await pool.query("SELECT 1 FROM mcp_usage LIMIT 1");
     return true;
   } catch {
     return false;

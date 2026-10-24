@@ -12,7 +12,7 @@ export interface SearchFilters {
 export interface NormalizedProduct {
   store: Store;
   product_id: number;
-  original_name: string;
+  original_name: string | null;
   sku: string | null;
   package_quantity: number | null;
   package_unit: string | null;
@@ -69,7 +69,9 @@ function safeHttpsUrl(value: unknown): string | null {
   if (!candidate) return null;
   try {
     const parsed = new URL(candidate);
-    return parsed.protocol === "https:" ? parsed.toString() : null;
+    return parsed.protocol === "https:" && !parsed.username && !parsed.password
+      ? parsed.toString()
+      : null;
   } catch {
     return null;
   }
@@ -112,20 +114,24 @@ export function normalizeProduct(rawValue: unknown): NormalizedProduct {
   const photos = Array.isArray(raw.photos) ? raw.photos : [];
   const primaryPhoto = photos
     .map(asRecord)
-    .find((photo) => photo.isPrimary === true);
-  const selectedPhoto = primaryPhoto ?? photos.map(asRecord)[0];
+    .find((photo) => photo.isPrimary === true && safeHttpsUrl(photo.photoUrl));
+  const selectedPhoto =
+    primaryPhoto ??
+    photos.map(asRecord).find((photo) => safeHttpsUrl(photo.photoUrl));
   const ingredientCard = asRecord(raw.ingredientCard);
   const ingredientAnalysis =
     Object.keys(ingredientCard).length > 0 ? ingredientCard : null;
 
-  const retailerUrl = safeHttpsUrl(
-    raw.externalUrl ?? (store === "rimi" ? raw.rimiUrl : null),
-  );
+  const retailerUrl =
+    safeHttpsUrl(raw.externalUrl) ??
+    (store === "rimi" ? safeHttpsUrl(raw.rimiUrl) : null);
   const imageUrl = selectedPhoto
     ? safeHttpsUrl(selectedPhoto.photoUrl)
     : null;
 
   const values: Record<string, unknown> = {
+    original_name:
+      typeof raw.name === "string" && raw.name.trim() ? raw.name : null,
     sku: cleanString(raw.sku),
     package_quantity: quantity,
     package_unit: quantityUnit,
@@ -174,7 +180,7 @@ export function normalizeProduct(rawValue: unknown): NormalizedProduct {
   return {
     store,
     product_id: id,
-    original_name: cleanString(raw.name) ?? "(unnamed product)",
+    original_name: values.original_name as string | null,
     sku: values.sku as string | null,
     package_quantity: quantity,
     package_unit: quantityUnit,
@@ -222,6 +228,15 @@ export function buildProductQuery(
   }
   if (filters.nutriScore) params.set("nutriScores", filters.nutriScore);
   return params;
+}
+
+export function compactProduct(product: NormalizedProduct) {
+  const {
+    energy_kcal, energy_kj, carbohydrates_per_100, saturated_fat_per_100,
+    fibre_per_100, ingredients_text, ingredient_analysis, nova_score,
+    ...summary
+  } = product;
+  return summary;
 }
 
 export function matchesFilters(

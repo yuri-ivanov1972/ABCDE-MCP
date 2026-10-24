@@ -1,10 +1,12 @@
 # ABCDE MCP
 
-Independent, nutrition-only MCP server and Latvian/English landing page for ABCDE.lv data. Implementation is in progress; see `docs/abcde-mcp/README.md` for the intended architecture and limitations.
+Independent, nutrition-only MCP server and Latvian/English landing page for ABCDE.lv data. See `docs/abcde-mcp/README.md` for architecture and limitations, and `docs/abcde-mcp/VERIFICATION.md` for checked and pending release behavior.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the MCP/API server with the managed workflow
+- `pnpm --filter @workspace/api-server run test` — domain/network tests
+- `pnpm --filter @workspace/api-server run test:protocol` — official SDK/live catalogue checks
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -18,19 +20,26 @@ Independent, nutrition-only MCP server and Latvian/English landing page for ABCD
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Build: esbuild (ESM server bundle), Vite (web)
+- MCP: official TypeScript SDK v2, Streamable HTTP
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/api-server/src/lib/mcp/` — tool registration, catalogue adapter, calculations, metrics, request context
+- `artifacts/abcde-mcp/src/App.tsx` — Latvian/English landing page
+- `lib/db/src/schema/mcp-metrics.ts` — aggregate tool calls and shared quota buckets
+- `lib/api-spec/openapi.yaml` — public stats contract
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Locally recheck upstream search filters; store leakage and ignored Maxima nutrient filters are known upstream limitations.
+- Keep search bounded rather than claiming exhaustive catalogue coverage.
+- Use the SDK's sessionless HTTP factory; never infer sessions from calls or client fingerprints.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Read-only `search_products`, `get_product`, and `build_basket` tools.
+- Nutrition-aware shopping lists grouped by retailer, with unknown values and partial totals disclosed.
 
 ## User preferences
 
@@ -41,7 +50,9 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Preserve API artifact proxy paths `/api`, `/mcp`, and `/health`.
+- Run codegen after changing the OpenAPI contract.
+- Configure the actual published URL only after publication; do not use a development URL on the landing page.
 
 ## Pointers
 

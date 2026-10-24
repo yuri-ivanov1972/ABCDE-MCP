@@ -9,6 +9,7 @@ import {
 import {
   calculateBasketLines,
   combineBasketItems,
+  compactProduct,
   roundOutput,
   type BasketLineInput,
   type Store,
@@ -25,7 +26,7 @@ const gradeSchema = z.enum(["A", "B", "C", "D", "E"]);
 const productSchema = z.object({
   store: storeSchema,
   product_id: z.number().int().positive(),
-  original_name: z.string(),
+  original_name: z.string().nullable(),
   sku: z.string().nullable(),
   package_quantity: z.number().nullable(),
   package_unit: z.string().nullable(),
@@ -53,7 +54,16 @@ const productSchema = z.object({
 });
 
 const searchOutputSchema = z.object({
-  products: z.array(productSchema),
+  products: z.array(productSchema.omit({
+    energy_kcal: true,
+    energy_kj: true,
+    carbohydrates_per_100: true,
+    saturated_fat_per_100: true,
+    fibre_per_100: true,
+    ingredients_text: true,
+    ingredient_analysis: true,
+    nova_score: true,
+  })),
   query: z.string().nullable(),
   partial: z.boolean(),
   pages_scanned: z.number().int(),
@@ -155,6 +165,9 @@ const basketInputSchema = z
   .strict();
 
 function jsonToolResult<T>(value: T, summary: string) {
+  if (Buffer.byteLength(JSON.stringify(value), "utf8") > 256 * 1024) {
+    return errorResult("The verified result is too large. Request fewer products or a smaller basket.");
+  }
   return {
     content: [{ type: "text" as const, text: summary }],
     structuredContent: value as Record<string, unknown>,
@@ -209,7 +222,7 @@ async function prepareTool(
       error:
         attempt.reason === "global_limit"
           ? "The service is handling its current request limit. Please retry in a minute."
-          : "This connection has reached its request limit. Please retry in a minute.",
+          : "Usage tracking is temporarily unavailable. Please retry shortly.",
     };
   }
   const deadline = makeToolDeadline(currentMcpRequestSignal());
@@ -255,7 +268,7 @@ export function createMcpServer(): McpServer {
           prepared.signal,
         );
         return jsonToolResult(
-          result,
+          { ...result, products: result.products.map(compactProduct) },
           `Checked ${result.candidate_count} catalogue candidates across ${result.pages_scanned} page(s); returned ${result.products.length} verified matches. ${result.coverage_note}`,
         );
       } catch (error) {
@@ -287,7 +300,7 @@ export function createMcpServer(): McpServer {
         );
         return jsonToolResult(
           product,
-          `Verified ${product.original_name} at ${product.store}. Nutrition values, package details, and missing-field warnings are included in structured data.`,
+          `Verified product ${product.product_id} at ${product.store}. Nutrition values, package details, and missing-field warnings are included in structured data.`,
         );
       } catch (error) {
         return errorResult(friendlyCatalogueError(error));

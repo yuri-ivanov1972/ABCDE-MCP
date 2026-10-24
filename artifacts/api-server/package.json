@@ -8,7 +8,8 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --experimental-strip-types --test src/lib/mcp/domain.test.ts"
+    "test": "node test.mjs",
+    "test:protocol": "node protocol-check.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "2.0.2",
@@ -25,6 +26,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

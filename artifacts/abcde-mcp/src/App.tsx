@@ -11,6 +11,25 @@ import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 const queryClient = new QueryClient();
 type Language = 'lv' | 'en';
 
+function publicEndpoint(value: string | undefined): string {
+  if (!value?.trim()) return '';
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase();
+    if (
+      url.protocol !== 'https:' ||
+      url.username || url.password || url.search || url.hash ||
+      !/^\/mcp\/?$/.test(url.pathname) ||
+      host === 'localhost' || host.endsWith('.localhost') ||
+      host === '127.0.0.1' || host === '[::1]' ||
+      host.endsWith('.replit.dev')
+    ) return '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
 const copyPrompts = {
   en: [
     'Suggest a high-protein shopping list for 3 people using Rimi and Maxima. Show package quantities and explain missing nutrition data.',
@@ -76,12 +95,12 @@ const translations = {
     usageTitle: 'A little about usage.',
     toolCalls: 'Aggregate tool calls',
     toolCallsCaption: 'Calls recorded by the MCP service',
-    sessions: 'Measured protocol sessions',
+    sessions: 'Measured MCP sessions',
     sessionless: 'Not measured for sessionless clients',
-    sessionsCaption: 'Session hashes retained for 30 days only when protocol sessions are available.',
+    sessionsCaption: 'This server uses a sessionless transport and does not store session IDs or hashes.',
     toolLoading: 'Loading',
     statsUnavailable: 'Currently unavailable',
-    privacy: 'Only aggregate tool-call counters are retained. Measured session hashes are retained for 30 days only when protocol sessions are available; sessionless clients are not counted as sessions. Infrastructure operational logs may exist.',
+    privacy: 'Only aggregate tool-call counters and short-lived rate-limit buckets are stored. Queries and session IDs are not stored by the application. This server is sessionless, so no session hashes are collected. Infrastructure operational logs may exist.',
     footer: 'Built by ABCDE Open Food Data Lab',
     footerTag: 'Independent Latvian / English project',
     langLabel: 'Language',
@@ -135,12 +154,12 @@ const translations = {
     usageTitle: 'Par lietojumu.',
     toolCalls: 'Kopējais rīka izsaukumu skaits',
     toolCallsCaption: 'MCP pakalpojuma reģistrētie izsaukumi',
-    sessions: 'Uzskaitītās protokola sesijas',
+    sessions: 'Uzskaitītās MCP sesijas',
     sessionless: 'Nav mērīts klientiem bez sesijas',
-    sessionsCaption: 'Sesiju jaucējkodi tiek glabāti 30 dienas tikai tad, ja ir pieejamas protokola sesijas.',
+    sessionsCaption: 'Šis serveris darbojas bez sesijām un nesaglabā sesiju identifikatorus vai jaucējkodus.',
     toolLoading: 'Ielādē',
     statsUnavailable: 'Pašlaik nav pieejams',
-    privacy: 'Tiek saglabāti tikai apkopoti rīka izsaukumu skaitītāji. Sesiju jaucējkodi tiek glabāti 30 dienas tikai tad, ja ir pieejamas protokola sesijas; klienti bez sesijas netiek skaitīti kā sesijas. Infrastruktūras darbības žurnāli var tikt veidoti.',
+    privacy: 'Lietotne saglabā tikai apkopotus rīku izsaukumu skaitītājus un īslaicīgus pieprasījumu ierobežojumu skaitītājus. Vaicājumi un sesiju identifikatori netiek saglabāti. Serveris darbojas bez sesijām, tāpēc sesiju jaucējkodi netiek vākti. Infrastruktūras darbības žurnāli var tikt veidoti.',
     footer: 'Veidojis ABCDE Open Food Data Lab',
     footerTag: 'Neatkarīgs projekts latviešu / angļu valodā',
     langLabel: 'Valoda',
@@ -161,7 +180,7 @@ function Home() {
     query: { queryKey: getGetPublicStatsQueryKey(), refetchInterval: 30_000 },
   });
   const content = translations[language];
-  const endpoint = import.meta.env.VITE_PUBLIC_MCP_URL?.trim() || '';
+  const endpoint = publicEndpoint(import.meta.env.VITE_PUBLIC_MCP_URL);
 
   useEffect(() => {
     document.documentElement.lang = language;

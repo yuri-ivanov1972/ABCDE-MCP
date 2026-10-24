@@ -75,9 +75,9 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-class UpstreamGate {
+export class UpstreamGate {
   private active = 0;
-  private lastStart = 0;
+  private nextStart = 0;
   private readonly queue: Array<{
     signal: AbortSignal;
     resolve: (release: () => void) => void;
@@ -85,14 +85,32 @@ class UpstreamGate {
     onAbort: () => void;
   }> = [];
 
+  constructor(
+    private readonly beforeStart: () => Promise<void> = consumeUpstreamBudget,
+    private readonly intervalMs = 500,
+    private readonly concurrency = 2,
+    private readonly maxQueue = 50,
+  ) {}
+
   async run<T>(signal: AbortSignal, request: () => Promise<T>): Promise<T> {
     const release = await this.acquire(signal);
     try {
-      const waitMs = Math.max(0, 500 - (Date.now() - this.lastStart));
+      const scheduledStart = Math.max(Date.now(), this.nextStart);
+      this.nextStart = scheduledStart + this.intervalMs;
+      const waitMs = Math.max(0, scheduledStart - Date.now());
       if (waitMs > 0) await sleep(waitMs, signal);
       if (signal.aborted) throw signal.reason;
-      this.lastStart = Date.now();
-      await consumeUpstreamBudget();
+      try {
+        await this.beforeStart();
+      } catch (error) {
+        throw new CatalogueError(
+          error instanceof Error && error.message === "upstream_budget_exhausted"
+            ? "rate_limited"
+            : "unavailable",
+          "shared_upstream_budget_unavailable",
+        );
+      }
+      if (signal.aborted) throw signal.reason;
       return await request();
     } finally {
       release();
@@ -101,11 +119,11 @@ class UpstreamGate {
 
   private acquire(signal: AbortSignal): Promise<() => void> {
     if (signal.aborted) return Promise.reject(signal.reason);
-    if (this.active < 2) {
+    if (this.active < this.concurrency) {
       this.active += 1;
       return Promise.resolve(this.makeRelease());
     }
-    if (this.queue.length >= 50) {
+    if (this.queue.length >= this.maxQueue) {
       return Promise.reject(new CatalogueError("rate_limited", "queue_full"));
     }
 
@@ -137,7 +155,7 @@ class UpstreamGate {
   }
 
   private drain(): void {
-    while (this.active < 2 && this.queue.length > 0) {
+    while (this.active < this.concurrency && this.queue.length > 0) {
       const entry = this.queue.shift();
       if (!entry) return;
       entry.signal.removeEventListener("abort", entry.onAbort);
@@ -272,72 +290,87 @@ function retryDelay(response: Response): number | null {
     : null;
 }
 
-async function performGet(
+export async function performGet(
   url: URL,
   signal: AbortSignal,
+  dependencies: {
+    gate: Pick<UpstreamGate, "run">;
+    fetcher: typeof fetch;
+    timeoutMs?: number;
+    retryWaitMs?: number;
+  } = { gate: upstreamGate, fetcher: fetch },
 ): Promise<{ value: unknown; bytes: number }> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     if (signal.aborted) throw signal.reason;
-    const attemptController = new AbortController();
-    const timeout = setTimeout(
-      () => attemptController.abort(new Error("upstream_timeout")),
-      UPSTREAM_TIMEOUT_MS,
-    );
-    const onAbort = () =>
-      attemptController.abort(signal.reason ?? new Error("request_cancelled"));
-    signal.addEventListener("abort", onAbort, { once: true });
-
+    let timedOut = false;
     try {
-      const response = await upstreamGate.run(signal, () =>
-        fetch(url, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          redirect: "error",
-          signal: attemptController.signal,
-        }),
-      );
-
-      if (response.status === 404) {
-        throw new CatalogueError("not_found", "product_not_found");
-      }
-      if (response.status === 429) {
-        const delay = retryDelay(response);
-        await response.body?.cancel();
-        if (attempt === 0 && delay !== null && delay < TOOL_DEADLINE_MS) {
-          await sleep(delay, signal);
-          continue;
+      const outcome = await dependencies.gate.run<
+        { value: unknown; bytes: number } | { retryMs: number }
+      >(signal, async () => {
+        const attemptController = new AbortController();
+        const timeout = setTimeout(() => {
+          timedOut = true;
+          attemptController.abort(new Error("upstream_timeout"));
+        }, dependencies.timeoutMs ?? UPSTREAM_TIMEOUT_MS);
+        const onAbort = () =>
+          attemptController.abort(signal.reason ?? new Error("request_cancelled"));
+        signal.addEventListener("abort", onAbort, { once: true });
+        try {
+          const response = await dependencies.fetcher(url, {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            redirect: "error",
+            signal: attemptController.signal,
+          });
+          if (response.status === 404) {
+            await response.body?.cancel();
+            throw new CatalogueError("not_found", "product_not_found");
+          }
+          if (response.status === 429) {
+            const delay = retryDelay(response);
+            await response.body?.cancel();
+            if (attempt === 0 && delay !== null && delay < TOOL_DEADLINE_MS) {
+              return { retryMs: delay } as const;
+            }
+            throw new CatalogueError("rate_limited", "upstream_rate_limited");
+          }
+          if (response.status >= 500) {
+            await response.body?.cancel();
+            if (attempt === 0) {
+              return { retryMs: dependencies.retryWaitMs ?? 250 } as const;
+            }
+            throw new CatalogueError("unavailable", "upstream_server_error");
+          }
+          if (!response.ok) {
+            await response.body?.cancel();
+            throw new CatalogueError("unavailable", "upstream_request_failed");
+          }
+          const value = await readBoundedJson(response);
+          return {
+            value,
+            bytes: new TextEncoder().encode(JSON.stringify(value)).byteLength,
+          };
+        } finally {
+          clearTimeout(timeout);
+          signal.removeEventListener("abort", onAbort);
         }
-        throw new CatalogueError("rate_limited", "upstream_rate_limited");
+      });
+      if ("retryMs" in outcome) {
+        await sleep(outcome.retryMs, signal);
+        continue;
       }
-      if (response.status >= 500) {
-        await response.body?.cancel();
-        if (attempt === 0) {
-          await sleep(250, signal);
-          continue;
-        }
-        throw new CatalogueError("unavailable", "upstream_server_error");
-      }
-      if (!response.ok) {
-        await response.body?.cancel();
-        throw new CatalogueError("unavailable", "upstream_request_failed");
-      }
-      const value = await readBoundedJson(response);
-      return { value, bytes: new TextEncoder().encode(JSON.stringify(value)).byteLength };
+      return outcome;
     } catch (error) {
       if (error instanceof CatalogueError) throw error;
       if (signal.aborted) throw signal.reason ?? error;
-      const timedOut = attemptController.signal.reason?.message === "upstream_timeout";
       if (attempt === 0) {
-        await sleep(250, signal);
+        await sleep(dependencies.retryWaitMs ?? 250, signal);
         continue;
       }
       throw new CatalogueError(
         timedOut ? "timeout" : "unavailable",
         timedOut ? "upstream_timeout" : "upstream_network_error",
       );
-    } finally {
-      clearTimeout(timeout);
-      signal.removeEventListener("abort", onAbort);
     }
   }
   throw new CatalogueError("unavailable", "upstream_request_failed");
@@ -389,6 +422,7 @@ async function getJson(
   params: URLSearchParams | undefined,
   signal: AbortSignal,
 ): Promise<unknown> {
+  if (signal.aborted) throw signal.reason;
   const url = getUrl(path, params);
   const key = url.toString();
   const cached = getCache(key);

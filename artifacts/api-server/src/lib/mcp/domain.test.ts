@@ -5,6 +5,7 @@ import {
   buildProductQuery,
   calculateBasketLines,
   combineBasketItems,
+  compactProduct,
   finiteNumber,
   matchesFilters,
   normalizeProduct,
@@ -254,4 +255,38 @@ test("unknown mass, missing protein, and missing products remain visible", () =>
   assert.equal(lines[2]?.original_name, null);
   assert.equal(lines[2]?.package_count, 2);
   assert.equal(lines[2]?.unresolved_reason, "Product not found.");
+});
+
+test("original names stay exact, missing names stay null, and URL/photo fallbacks are safe", () => {
+  const original = '  Oriģinālais nosaukums  ';
+  const product = normalizeProduct({
+    ...rimiBread,
+    name: original,
+    externalUrl: "",
+    rimiUrl: "https://www.rimi.lv/product",
+    photos: [
+      { isPrimary: true, photoUrl: "javascript:alert(1)" },
+      { photoUrl: "https://images.example/product.jpg" },
+    ],
+  });
+  assert.equal(product.original_name, original);
+  assert.equal(product.retailer_url, "https://www.rimi.lv/product");
+  assert.equal(product.image_url, "https://images.example/product.jpg");
+  const missing = normalizeProduct({ ...maximaBread, name: "", externalUrl: null, rimiUrl: "https://rimi.lv/not-maxima" });
+  assert.equal(missing.original_name, null);
+  assert.equal(missing.retailer_url, null);
+  assert.ok(missing.missing_fields.includes("original_name"));
+});
+
+test("compact search products omit long ingredient details and zero bounds still match zero", () => {
+  const product = normalizeProduct({
+    ...rimiBread,
+    ingredientCard: { longAnalysis: "details" },
+    nutrition: { ...rimiBread.nutrition, protein: 0, carbsSugars: 0 },
+  });
+  assert.equal(matchesFilters(product, { store: "both", minProtein: 0, maxSugar: 0 }), true);
+  const summary = compactProduct(product);
+  assert.equal(summary.protein_per_100, 0);
+  assert.equal("ingredient_analysis" in summary, false);
+  assert.equal("ingredients_text" in summary, false);
 });
