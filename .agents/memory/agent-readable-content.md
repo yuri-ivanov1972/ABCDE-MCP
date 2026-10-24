@@ -20,3 +20,9 @@ Use `https://abcde-mcp.replit.app/mcp` as the authoritative connection address i
 **Why:** The owner explicitly requested this real address, rather than a preview URL or configurable substitute.
 
 **How to apply:** Keep displayed instructions, clipboard output and generated documents aligned. Do not restore an environment override without a new owner request.
+
+Do not describe this connector as requiring Claude Pro or Max: the owner states Claude Free supports one MCP connector.
+
+**Why:** The owner corrected the paid-plan-only setup wording.
+
+**How to apply:** Include Free and its one-connector limit when describing plan eligibility. This is an owner-provided product claim, not independently verified vendor policy; recheck current vendor documentation before changing eligibility claims later.

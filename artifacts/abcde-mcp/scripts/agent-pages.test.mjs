@@ -47,7 +47,7 @@ for (const [language, route] of [['lv', '/'], ['en', '/en/']]) {
     assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
     assert.equal(html.includes('<!--page-'), false);
     assert.equal(html.includes('Update this description'), false);
-    for (const item of [c.intro, c.adminNote, c.privacy, c.statsStaticNote, c.footer, c.footerTag,
+    for (const item of [c.intro, c.setupIntro, c.adminNote, c.privacy, c.statsStaticNote, c.footer, c.footerTag,
       ...c.steps.flat(), ...content.copyPrompts[language],
       ...c.stepsSetup.map((item) => plain(renderToStaticMarkup(item))),
       ...c.limitations.map((item) => plain(renderToStaticMarkup(item))),
