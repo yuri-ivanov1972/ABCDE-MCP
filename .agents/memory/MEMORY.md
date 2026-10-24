@@ -1,0 +1,1 @@
+- [MCP SDK schema compatibility](mcp-schema-compatibility.md) — SDK v2 needs modern Zod Standard JSON Schema support, not the older workspace Zod/v4 compatibility export.

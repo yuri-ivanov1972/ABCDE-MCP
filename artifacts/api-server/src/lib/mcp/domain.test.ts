@@ -77,7 +77,7 @@ test("product normalization keeps store-qualified identifiers and numeric zero",
   assert.equal(maxima.nutrition_source_date, null);
   assert.equal(maxima.nutri_score, "D");
   assert.throws(
-    () => normalizeProduct({ ...rimiBread, store: "maxima" }),
+    () => normalizeProduct({ ...rimiBread, store: "unknown" }),
     /identity/,
   );
 });

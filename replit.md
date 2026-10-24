@@ -1,6 +1,6 @@
-# [Project name]
+# ABCDE MCP
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Independent, nutrition-only MCP server and Latvian/English landing page for ABCDE.lv data. Implementation is in progress; see `docs/abcde-mcp/README.md` for the intended architecture and limitations.
 
 ## Run & Operate
 
@@ -34,7 +34,10 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Latvian is the default landing-page language, with an English switch.
+- Keep ABCDE.lv read-only; do not connect retailer databases.
+- Nutrition only: no prices, accounts, carts, checkout, or guaranteed stock.
+- Do not publish automatically or display a guessed public MCP URL.
 
 ## Gotchas
 
