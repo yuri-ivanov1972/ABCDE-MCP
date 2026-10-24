@@ -39,6 +39,19 @@ async function invoke(client, name, args, expectError = false) {
   return result.structuredContent;
 }
 
+function checkAssessment(assessment) {
+  assert.ok(assessment, "FODMAP assessment must survive output-schema validation");
+  assert.ok(["potential_concern", "no_listed_concern", "insufficient_information"].includes(assessment.outcome));
+  assert.ok(assessment.rule_version.length > 0);
+  assert.ok(assessment.source_urls.includes("https://www.monashfodmap.com/blog/update-label-reading/"));
+  assert.ok(assessment.uncertainties.some((note) => note.includes("not verified low-FODMAP")));
+  for (const evidence of assessment.evidence) {
+    assert.ok(evidence.matched_term.length > 0);
+    assert.ok(evidence.rule_id.length > 0);
+    assert.ok(evidence.source_urls.length > 0);
+  }
+}
+
 // Both the legacy initialize handshake used by existing clients and modern
 // protocol negotiation must work through the same public proxy route.
 for (const mode of ["legacy", "auto"]) {
@@ -118,6 +131,60 @@ for (const mode of ["legacy", "auto"]) {
       ],
     }, true);
     console.log("PASS missing product, partial basket, all-failed basket, and duplicate quantity limit");
+    for (const [store, product_id] of [["rimi", 3975], ["maxima", 7451]]) {
+      const detail = await invoke(client, "get_product", { store, product_id, ingredient_screening: "fodmap" });
+      checkAssessment(detail.fodmap_assessment);
+      assert.equal(detail.fodmap_assessment.ingredients_text, detail.ingredients_text);
+    }
+    for (const include_review of [false, true]) {
+      const screened = await invoke(client, "search_products", {
+        query: "maize", store: "rimi", max_results: 2,
+        ingredient_screening: "fodmap", include_review,
+      });
+      assert.equal(screened.screening.mode, "fodmap");
+      assert.ok(screened.screening.detail_lookups <= 10);
+      assert.ok(screened.candidate_count <= 300);
+      assert.equal(screened.screening.eligible_count,
+        screened.screening.assessed_count + screened.screening.unassessed_count);
+      assert.equal(screened.screening.eligible_count,
+        screened.screening.flagged_count + screened.screening.unknown_count + screened.screening.no_listed_concern_count);
+      for (const product of screened.products) {
+        checkAssessment(product.fodmap_assessment);
+        assert.equal(product.fodmap_assessment.outcome, "no_listed_concern");
+      }
+      if (include_review) {
+        assert.ok(Array.isArray(screened.review_products));
+        assert.ok(screened.review_products.length <= 2);
+        for (const product of screened.review_products) {
+          checkAssessment(product.fodmap_assessment);
+          assert.notEqual(product.fodmap_assessment.outcome, "no_listed_concern");
+        }
+      } else assert.equal(screened.review_products, undefined);
+    }
+    for (const [baseline, items] of [
+      [basket, [
+        { store: "rimi", product_id: 3975, quantity: 2 },
+        { store: "maxima", product_id: 7451, quantity: 1 },
+      ]],
+      [partial, [
+        { store: "rimi", product_id: 3975, quantity: 1 },
+        { store: "maxima", product_id: 999999999, quantity: 1 },
+      ]],
+    ]) {
+      const screened = await invoke(client, "build_basket", { items, ingredient_screening: "fodmap" });
+      assert.equal(screened.known_protein_g, baseline.known_protein_g);
+      assert.equal(screened.total_protein_g, baseline.total_protein_g);
+      assert.deepEqual(screened.overall_nutrition_completeness, baseline.overall_nutrition_completeness);
+      for (let index = 0; index < screened.groups.length; index++) {
+        const stripped = screened.groups[index].lines.map(({ fodmap_assessment, ...line }) => {
+          checkAssessment(fodmap_assessment);
+          return line;
+        });
+        assert.deepEqual(stripped, baseline.groups[index].lines);
+      }
+      assert.ok(screened.warnings.some((note) => note.includes("does not remove basket items")));
+    }
+    console.log(`PASS ${mode}: FODMAP search exclusion/review, both retailers' details, and unchanged complete/partial baskets`);
     console.log(`PASS ${mode}: all three tools expose complete, equivalent text and structured data`);
   } finally {
     await client.close();

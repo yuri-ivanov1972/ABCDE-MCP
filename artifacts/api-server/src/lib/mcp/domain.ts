@@ -1,3 +1,5 @@
+import { assessFodmap, type FodmapAssessment } from "./fodmap";
+
 export type Store = "rimi" | "maxima";
 export type StoreChoice = Store | "both";
 export type NutriScore = "A" | "B" | "C" | "D" | "E";
@@ -7,6 +9,8 @@ export interface SearchFilters {
   minProtein?: number;
   maxSugar?: number;
   nutriScore?: NutriScore;
+  ingredientScreening?: "fodmap";
+  includeReview?: boolean;
 }
 
 export interface NormalizedProduct {
@@ -37,6 +41,7 @@ export interface NormalizedProduct {
   ingredients_text: string | null;
   ingredient_analysis: Record<string, unknown> | null;
   nova_score: number | null;
+  fodmap_assessment?: FodmapAssessment;
 }
 
 type RawRecord = Record<string, unknown>;
@@ -293,6 +298,7 @@ export interface BasketLine {
   protein_contribution_g: number | null;
   unresolved_reason: string | null;
   nutri_score: NutriScore | null;
+  fodmap_assessment?: FodmapAssessment;
 }
 
 export function combineBasketItems(
@@ -334,6 +340,7 @@ export function packageMassGrams(product: NormalizedProduct): number | null {
 
 export function calculateBasketLines(
   inputs: BasketLineInput[],
+  screening?: "fodmap",
 ): BasketLine[] {
   return inputs.map((line) => {
     const product = line.product;
@@ -364,6 +371,7 @@ export function calculateBasketLines(
       protein_contribution_g: contribution,
       unresolved_reason: reason,
       nutri_score: product?.nutri_score ?? null,
+      ...(screening ? { fodmap_assessment: assessFodmap(product) } : {}),
     };
   });
 }

@@ -71,3 +71,29 @@ pnpm --filter @workspace/api-server run test:protocol
 ```
 
 For a published release, pass its actual `/mcp` URL to `test:protocol`, then perform the real Claude-account connection check. Do not infer production readiness from a development test or an HTTP 200 alone.
+
+## FODMAP ingredient screening — 2026-10-24
+
+### Data and scope
+
+- A bounded public catalogue sample checked list and detail ingredient text for two Rimi products (3975, 6504) and two Maxima products (7451, 5777). All four included ingredient text in both responses. This small sample does not establish catalogue-wide ingredient availability.
+- Each sampled product also had an ingredient-analysis object with general ingredient/count fields. Those are not validated FODMAP measurements and are not used as a suitability verdict.
+- The optional screen uses a small deterministic Latvian/English rule set referencing Monash's public label-reading guidance and ingredient-scanning limitations. It has not undergone independent dietitian or clinical validation. Unsupported words, uncertain amounts or processing, missing lists and ambiguous labels remain unknown; even `no_listed_concern` is not verified low-FODMAP suitability.
+
+### Passed in development
+
+- All **53 automated tests** passed: the earlier 27 plus 26 FODMAP and screening-search regressions.
+- Coverage includes bilingual/accented aliases, unchanged ingredient evidence, word boundaries, compound ingredients, unsupported language, unknown vocabulary, order/amount uncertainty, locally scoped lactose-free qualifications, garlic-infused oil, separate precautionary notices, ambiguous notice boundaries and oversized screening text.
+- Search tests cover default exclusion, explicit bounded review rows, continuing after rejected candidates, detail hydration, the ten-lookup ceiling, failed/mismatched details, local store/nutrition checks before and after hydration, deduplication, three-page/300-candidate bounds, later-page partial failure, and cancellation before/during requests.
+- Basket tests verify retained lines/quantities, unknown missing-product assessments, unchanged protein contributions, and no screening fields for ordinary requests. Formatter tests preserve the complete assessment in compact search results and equivalent text/structured output.
+- API TypeScript checking passed. The production API bundle built successfully during the single managed API workflow restart; the service came up on its configured port.
+- Official-client checks against the development `/mcp` endpoint passed for legacy initialization and modern automatic negotiation. Each mode checked screened product details for both retailers, default search exclusion, separate review results, screening-count consistency, and complete/partial baskets with unchanged nutrition totals and lines.
+- All three tools' full screening evidence survived output-schema validation and matched the JSON text representation. **34 actual tool attempts** were reflected in aggregate counters, including the original nutrition-only checks; counters were not reset.
+- No landing-page, slide-deck, authentication, database-schema or publication settings were changed. Whole-workspace TypeScript checking was not repeated: the previously recorded unrelated slide chart errors remain outside this task; the relevant API check passed.
+
+### Not yet verified
+
+- This feature has not been published by the agent. Development success does not establish that the currently published connector has the new schema or behavior.
+- After the owner republishes, obtain the actual endpoint using deployment metadata, rerun `test:protocol` against it, then verify a real Claude conversation requesting FODMAP-screened products and ingredient evidence. If the connector retains an older tool definition, refresh its tool definitions before retrying.
+- The conservative rule set has not been evaluated against a representative, independently reviewed Latvian/English label corpus. Language/ingredient vocabulary expansion needs sourced rules and regression fixtures, not optimistic guessing.
+- No laboratory FODMAP ratings, safe serving amounts, personalized tolerances or combined-meal FODMAP totals were verified or invented.

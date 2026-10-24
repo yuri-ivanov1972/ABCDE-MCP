@@ -7,6 +7,9 @@ import {
   type Store,
 } from "./domain";
 import { consumeUpstreamBudget } from "./metrics";
+import { assessFodmap, FODMAP_LIMITATION, FODMAP_RULE_VERSION } from "./fodmap";
+import type { z } from "zod/v4";
+import type { screeningCoverageSchema } from "./fodmap-schema";
 
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 10_000;
@@ -42,6 +45,8 @@ export interface SearchResult {
   candidate_count: number;
   has_more_candidates: boolean | null;
   coverage_note: string;
+  screening?: z.infer<typeof screeningCoverageSchema>;
+  review_products?: NormalizedProduct[];
 }
 
 interface CacheEntry {
@@ -492,6 +497,13 @@ export async function searchProducts(
   filters: SearchFilters,
   maxResults: number,
   signal: AbortSignal,
+  dependencies: {
+    list: (params: URLSearchParams, signal: AbortSignal) => Promise<unknown>;
+    detail: typeof getProduct;
+  } = {
+    list: (params, requestSignal) => getJson("products", params, requestSignal),
+    detail: getProduct,
+  },
 ): Promise<SearchResult> {
   const trimmedQuery = query?.trim() || undefined;
   const found: NormalizedProduct[] = [];
@@ -501,8 +513,17 @@ export async function searchProducts(
   let upstreamFailure: CatalogueError | null = null;
   let stoppedEarly = false;
   const seen = new Set<string>();
+  const reviews: NormalizedProduct[] = [];
+  const screening: SearchResult["screening"] = filters.ingredientScreening ? {
+    mode: "fodmap", rule_version: FODMAP_RULE_VERSION,
+    eligible_count: 0, assessed_count: 0, flagged_count: 0, unknown_count: 0,
+    no_listed_concern_count: 0, unassessed_count: 0, detail_lookups: 0,
+    detail_failures: 0, review_returned: 0, review_omitted: 0,
+    partial: false, limitation: FODMAP_LIMITATION,
+  } : undefined;
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
+    if (signal.aborted) throw signal.reason;
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(PAGE_SIZE),
@@ -520,10 +541,11 @@ export async function searchProducts(
     let response: { products: unknown[]; totalCount: number | null };
     try {
       response = productListResponse(
-        await getJson("products", params, signal),
+        await dependencies.list(params, signal),
       );
     } catch (error) {
-      if (page === 1 || found.length === 0) throw error;
+      if (signal.aborted) throw signal.reason;
+      if (page === 1 || (found.length === 0 && !screening?.eligible_count)) throw error;
       upstreamFailure =
         error instanceof CatalogueError
           ? error
@@ -531,22 +553,66 @@ export async function searchProducts(
       break;
     }
 
+    if (signal.aborted) throw signal.reason;
     pagesScanned += 1;
     totalCount = response.totalCount;
     let checkedThisPage = 0;
-    for (const raw of response.products) {
+    for (const raw of response.products.slice(0, PAGE_SIZE)) {
+      if (signal.aborted) throw signal.reason;
       candidates += 1;
       checkedThisPage += 1;
+      let product: NormalizedProduct;
       try {
-        const product = normalizeProduct(raw);
-        const identity = `${product.store}:${product.product_id}`;
-        if (!seen.has(identity) && matchesFilters(product, filters)) {
-          found.push(product);
-          seen.add(identity);
-        }
+        product = normalizeProduct(raw);
       } catch {
         // A malformed candidate is excluded rather than normalized from guesses.
+        continue;
       }
+      const identity = `${product.store}:${product.product_id}`;
+      if (seen.has(identity)) continue;
+      if (!matchesFilters(product, filters)) continue;
+      seen.add(identity);
+      if (screening) {
+        screening.eligible_count++;
+        let unavailable: string | undefined;
+        if (!product.ingredients_text) {
+          if (screening.detail_lookups >= 10) {
+            unavailable = "The ten-detail screening lookup budget is exhausted; this candidate remains unassessed.";
+          } else {
+            screening.detail_lookups++;
+            try {
+              const detail = await dependencies.detail(product.store, product.product_id, signal);
+              if (detail.store !== product.store || detail.product_id !== product.product_id) {
+                throw new CatalogueError("invalid_response", "product_identity_mismatch");
+              }
+              product = detail;
+            } catch {
+              if (signal.aborted) throw signal.reason;
+              screening.detail_failures++;
+              unavailable = "Product details could not be obtained within catalogue limits; ingredient screening remains incomplete.";
+            }
+          }
+        }
+        // A detail response may differ from a stale list; never bypass the
+        // user's store/nutrient constraints after hydration.
+        if (!matchesFilters(product, filters)) {
+          screening.eligible_count--;
+          continue;
+        }
+        if (signal.aborted) throw signal.reason;
+        if (unavailable) screening.unassessed_count++;
+        else screening.assessed_count++;
+        const assessment = assessFodmap(product, unavailable);
+        product = { ...product, fodmap_assessment: assessment };
+        if (assessment.outcome === "potential_concern") screening.flagged_count++;
+        else if (assessment.outcome === "insufficient_information") screening.unknown_count++;
+        else screening.no_listed_concern_count++;
+        if (assessment.outcome !== "no_listed_concern") {
+          if (filters.includeReview && reviews.length < maxResults) reviews.push(product);
+          continue;
+        }
+      }
+      found.push(product);
       if (found.length >= maxResults) {
         stoppedEarly =
           checkedThisPage < response.products.length ||
@@ -556,7 +622,7 @@ export async function searchProducts(
     }
 
     const pageMayHaveMore =
-      response.products.length === PAGE_SIZE &&
+      response.products.length >= PAGE_SIZE &&
       (totalCount === null || totalCount > page * PAGE_SIZE);
     if (
       found.length >= maxResults ||
@@ -575,13 +641,18 @@ export async function searchProducts(
       : totalCount === null
         ? pagesScanned === MAX_PAGES
         : totalCount > candidates;
-  const partial = hasMore || upstreamFailure !== null;
+  const partial = hasMore || upstreamFailure !== null || (screening?.unassessed_count ?? 0) > 0;
   const coverageNote = upstreamFailure
     ? "Some candidates could not be checked because the catalogue request failed. Results are partial."
     : partial
       ? "At most three pages of candidates were checked. More candidates may exist; this is not an exhaustive catalogue result."
       : "All candidates in the bounded API response were checked; this does not guarantee full catalogue coverage.";
 
+  if (screening) {
+    screening.partial = partial;
+    screening.review_returned = reviews.length;
+    screening.review_omitted = screening.flagged_count + screening.unknown_count - reviews.length;
+  }
   return {
     products: found.slice(0, maxResults),
     query: trimmedQuery ?? null,
@@ -589,7 +660,9 @@ export async function searchProducts(
     pages_scanned: pagesScanned,
     candidate_count: candidates,
     has_more_candidates: hasMore,
-    coverage_note: coverageNote,
+    coverage_note: coverageNote + (screening ? ` ${FODMAP_LIMITATION} ${screening.unassessed_count} eligible candidate(s) could not be assessed; matches exclude all flagged and unknown candidates.` : ""),
+    ...(screening ? { screening } : {}),
+    ...(screening && filters.includeReview ? { review_products: reviews } : {}),
   };
 }
 

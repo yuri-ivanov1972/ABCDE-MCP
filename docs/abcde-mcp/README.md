@@ -70,6 +70,45 @@ The adapter therefore:
 
 The adapter is intentionally separate from MCP tool definitions so a corrected upstream API can be adopted later without changing the tool contracts.
 
+## Optional FODMAP ingredient screening
+
+Set `ingredient_screening: "fodmap"` on any of the three existing tools. Omit it for the original nutrition-only behavior. This is a limited Latvian/English **ingredient screen**, not lab-tested low-FODMAP classification, medical advice, certification, an allergen guarantee, or a serving-size recommendation.
+
+For example, Claude can call `search_products` with:
+
+```json
+{
+  "query": "rīsi",
+  "store": "rimi",
+  "max_results": 5,
+  "ingredient_screening": "fodmap",
+  "include_review": true
+}
+```
+
+- `products` contains only candidates assessed as `no_listed_concern`. This means the limited rules found no listed concern, **not** that the product is verified low-FODMAP or suitable at any portion.
+- `review_products` appears only when `include_review: true` is explicitly requested alongside screening. It contains flagged and unknown candidates separately, capped at `max_results`; these never fill the matching-products quota.
+- Each product's `fodmap_assessment` includes the unchanged source ingredient text, precautionary text, outcome, matched original terms, rule identifiers, explanations, source links, uncertainties, and rule-set version.
+- Outcomes are `potential_concern`, `no_listed_concern`, and `insufficient_information`. Missing ingredient text, unsupported/unrecognized vocabulary, vague mixtures, incomplete labels, and uncertain ingredient amounts or processing cannot become optimistic matches.
+- Added onion/garlic, concentrated inulin/FOS/GOS, listed polyols and declared lactose are potential concerns. Cereals, dairy and other quantity-dependent ingredients require qualified review, not blanket “high-FODMAP” judgments. Local lactose-free qualifications do not override other ingredients; garlic-infused oil needs preparation review.
+- “May contain” notices are separate advisory evidence, not declared ingredients or measured FODMAP doses. Ambiguous nested notice boundaries require review. This does not implement an allergy-avoidance policy.
+- The rule set is small and conservative: even an otherwise reasonable product may need review because its label vocabulary is unsupported. Product names, sugar totals, Nutri-Score, gluten-free claims, and the catalogue's unvalidated ingredient-analysis scores cannot establish FODMAP suitability.
+- **Serving size, ingredient quantity, processing effects, and combined meal load remain unverified for every outcome.** No laboratory ratings or safe portion thresholds are invented.
+
+The rules reference public [Monash label-reading guidance](https://www.monashfodmap.com/blog/update-label-reading/) and its [ingredient-scanning limitations](https://www.monashfodmap.com/get-app-help/), not a copied proprietary food-rating database. The rules have not undergone independent dietitian or clinical validation.
+
+### Coverage and shopping lists
+
+Screening happens before the match limit, after local store/nutrition checks. At most three pages of 100 candidates are inspected. Missing lists can trigger at most ten extra detail lookups per search using the same cache, request gate, shared quotas, deadline and cancellation as other catalogue work. A lookup can use the existing bounded safe retry, so a lookup is not the same as a single upstream start. A hydrated detail is checked again against the requested nutrition filters.
+
+`screening` reports eligible, assessed, flagged, unknown, no-listed-concern, and unassessed counts, detail lookups/failures, and review rows returned/omitted. `eligible_count = assessed_count + unassessed_count = flagged_count + unknown_count + no_listed_concern_count`. Unknown includes unassessed candidates; budget-limited and failed lookups mark coverage partial. Counts cover unique candidates passing local store/nutrition checks, not the whole catalogue. Review omission counts are explicit even when review rows are hidden by default.
+
+`get_product` with screening returns the assessment alongside full details. `build_basket` with screening attaches an assessment to **every line**, including an unknown assessment for unresolved products. It does not remove flagged/unknown items, change package quantities, or change protein calculations; review all such lines before shopping.
+
+Suggested Claude prompt after publishing: “Find Rimi rice products using FODMAP ingredient screening. Show ingredient evidence, and keep uncertain products in a separate review list. Do not describe them as verified low-FODMAP.”
+
+The complete assessment is included in both JSON text and structured tool output. Existing 256 KiB whole-result bounds still apply; request fewer products if a detailed response is too large. Dietary queries and health profiles are not persisted.
+
 ## Basket calculation
 
 Basket quantity means packages (not portions or grams). Identical `(store, product_id)` entries combine; a combined product quantity over 20 or basket total over 100 packages is rejected. Product name, package size, nutrition, and links are fetched from the server-side catalogue rather than trusted from caller-supplied values.
