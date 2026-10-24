@@ -1,0 +1,255 @@
+Build a new, standalone Replit web project called "ABCDE MCP".
+
+This is NOT a request to modify or remix the existing ABCDE.lv website, create a mobile app, copy retailer databases, or add an embedded chatbot. Build an actual Node.js + TypeScript MCP server and a one-page bilingual landing page. Claude is the conversational interface; this project does not need its own LLM or translation API.
+
+PRODUCT AND FIRST-RELEASE SCOPE
+
+Let people connect Claude to ABCDE.lv food data for BOTH Rimi and Maxima and assemble nutrition-focused shopping lists by chatting.
+- Public, read-only, no authentication or user accounts.
+- Latvian and English landing page and tool/conversation guidance.
+- Original Latvian product names remain unchanged.
+- Claude translates English search terms into Latvian and explains results in the user's language.
+- Shopping lists link to retailers; they do NOT create a retailer cart, place orders, or check out.
+- Maxima links currently lead to Barbora.
+- No email signup, payment, favourites, scanning, clinical advice, allergy-safety promises, or guaranteed live stock.
+
+PRICING DECISION: NUTRITION-ONLY
+
+Do not implement or advertise prices, discounts, max_price, price-per-kg, budgets, value rankings, line prices, or grand total prices in this release.
+The source database defines price history, but current product API responses do not expose prices. Price coverage, freshness, currencies, units, and discount conditions have NOT been audited. The owner explicitly approved launching nutrition-only when prices cannot be relied on.
+Do not invent prices, substitute zero, scrape retailers, or pause the entire project waiting for price access. Tell users that verified prices are unavailable and they should review the retailer website.
+Pricing requires a separately approved extension to the existing ABCDE.lv API; it is not work for this new project.
+
+REAL DATA SOURCE: ALREADY EXISTS
+
+Base URL: https://abcde.lv/api
+Public catalogue requests currently require NO API key. Use a server-side ABCDE_API_URL configuration defaulting to that exact URL. It is a public URL, not inherently a secret, but keep data access on the server.
+Do not request ABCDE_API_KEY unless the upstream actually introduces authentication.
+Never request, copy, or connect RIMI_DATABASE_URL or MAXIMA_DATABASE_URL here.
+If deployment needs its own durable database for aggregate counters, use this project's own managed storage; that is unrelated to the catalogue databases.
+
+Working endpoints:
+GET /products?store=rimi&page=1&pageSize=20
+GET /products?store=maxima&page=1&pageSize=20
+GET /products?search=maize&proteinMin=10&pageSize=20&sortBy=protein&sortOrder=desc
+GET /products/3975?store=rimi
+GET /products/7451?store=maxima
+GET /categories?level=1
+GET /categories?parentId=10
+GET /categories/10
+GET /categories/10/path
+GET /healthz
+
+Resolve these relative to https://abcde.lv/api/, not the origin root: avoid accidentally replacing /api with /products when joining URLs.
+The catalogue returns { "products": [...], "totalCount": number }.
+Ordinary product detail returns the product object DIRECTLY, not {product: ...}.
+Categories return arrays or a single category object as applicable.
+The existing /mobile/product/:store/:id response is less complete: do not use it for MCP details.
+The old project's OpenAPI file lists only the health endpoint; it is incomplete, not evidence that catalogue routes do not exist.
+
+Catalogue parameters:
+- page: integer 1..500, default 1; pageSize: integer 1..100, default 12.
+- search: 2..200 characters; omit search entirely for filter-only browsing.
+- store: rimi or maxima; omission means both.
+- categoryId: numeric; reliable for browsing, not guaranteed in text search.
+- nutriScores: comma-separated A,B,C,D,E.
+- proteinMin/proteinMax, sugarMin/sugarMax, saltMin/saltMax, fatMin/fatMax: numeric.
+- madeInLatvia=true.
+- sortBy=name|nutriScore|sugar|fat|protein|salt, sortOrder=asc|desc.
+- No price or language parameter.
+
+ACTUAL DATA EXAMPLES
+
+Public responses were captured on 2026-10-24. These are shortened projections, not the full schema. IDs/counts can change; discover products live.
+
+Rimi product:
+{
+  "productId": 3975,
+  "sku": "952513",
+  "name": "\"LATVIJAS Graudu maize\" kliju pilngraudu 300g",
+  "quantityValue": "300.00",
+  "quantityUnit": "g",
+  "store": "rimi",
+  "externalUrl": "https://www.rimi.lv/e-veikals/lv/produkti/p/952513",
+  "slug": "latvijas-graudu-maize-kliju-pilngraudu-300g-3975",
+  "nutrition": {"protein":"11.10","carbsSugars":"0.50","fatTotal":"3.60","salt":"1.00","nutriScoreGrade":"B"}
+}
+
+Maxima product:
+{
+  "productId": 7451,
+  "name": "100% rudzu miltu tostermaize Latvijas Tost Maize LATVIJAS MAIZNIEKS 390g",
+  "quantityValue": "390",
+  "quantityUnit": "g",
+  "store": "maxima",
+  "externalUrl": "https://barbora.lv/produkti/tostermaize-latv-tost-maize-rudzu-390-g",
+  "nutrition": {"protein":"11.9","carbsSugars":"4.6","fatTotal":"4.6","salt":"1.6","nutriScoreGrade":"D","dataSourceDate":null}
+}
+
+Category example:
+{"categoryId":10,"rimiCategoryCode":"SH-7","nameLv":"Maize un konditoreja","nameEn":"Bread and pastry shop","parentCategoryId":null,"level":1,"slug":"maize-un-konditoreja-10"}
+
+FIELD MAPPING AND MISSING DATA
+
+Normalize a product to:
+store, product_id, original_name, sku, package_quantity, package_unit,
+protein_per_100, sugar_per_100, fat_per_100, salt_per_100, nutrient_basis,
+nutri_score, retailer_url, image_url, category_name_lv, category_name_en,
+nutrition_source_date, missing_fields, warnings.
+Add energy, carbohydrate, saturated fat, fibre, ingredients text, optional ingredient-analysis information, and NOVA in full detail.
+
+Source paths:
+- product_id = productId; original_name = name.
+- package_quantity/package_unit = quantityValue/quantityUnit.
+- protein = nutrition.protein; sugar = nutrition.carbsSugars.
+- fat = nutrition.fatTotal; salt = nutrition.salt.
+- energy = nutrition.energyKcal/energyKj; carbohydrates = nutrition.carbsTotal.
+- saturated fat = nutrition.fatSaturated; fibre = nutrition.fiber.
+- grade = nutrition.nutriScoreGrade; ingredients = nutrition.ingredientsText.
+- optional analysis = ingredientCard; NOVA = novaScore.
+- retailer_url = externalUrl, falling back to rimiUrl only for Rimi.
+- image_url = primary photos[].photoUrl, falling back to the first photo, else null.
+- categories = category.nameLv/nameEn.
+- nutrition_source_date = nutrition.dataSourceDate, nullable.
+
+No dedicated brand, price, currency, or price-per-kg is exposed. Do not infer a verified brand from a name.
+Product updatedAt does not establish price or nutrition freshness.
+Nutrition decimal fields may be strings or numbers. Parse strictly to finite numbers. Missing, empty, or invalid values are null, NOT zero. Preserve legitimate zero.
+No explicit per-100-g versus per-100-ml basis field exists. For g/kg foods, expose nutrient_basis="assumed_per_100g" using the site's convention and disclose that assumption. For volume/piece/unknown-unit products use an unknown basis unless verified by actual source data. Do not describe uncertain values as verified per-100-g.
+Ingredient analysis is not medical advice, a complete ingredient inventory, or a validated allergen classification.
+
+CRITICAL UPSTREAM FILTER LIMITATIONS
+
+Confirmed by source and live responses:
+1. With search present, store=rimi and store=maxima can return the SAME mixed-store list. In one test, both returned Maxima 11277 then Rimi 192.
+2. Maxima nutrient bounds are not fully applied. search=maize&store=maxima&proteinMin=90 returned Maxima products with protein 17.0 and 16.0.
+3. Numeric nutrient filtering is also incomplete in the non-search Maxima helper; category selection is not guaranteed during text search.
+4. Search merges bounded candidates (up to 1,000 per store internally). API totals/rankings are not guarantees of exhaustive catalogue coverage.
+
+Therefore enforce ALL requested store/nutrient constraints again in this server using actual product fields, on every returned result. Missing or incompatible-basis nutrient values do not satisfy per-100-g constraints. Do not relabel a product's store.
+Use at most three upstream pages of up to 100 candidates per search invocation to fill max_results. For text search, one mixed-store candidate stream is enough; do not duplicate the same request per retailer. Stop early once enough validated matches are found.
+Return partial coverage and has_more_candidates honestly when bounded scanning ends; "no verified matches in the checked candidates" is not "no such products exist".
+Do not claim a global best/highest-protein product or exact post-filter total. Do not work around this by mirroring/downloading the entire catalogue.
+This project must not modify the upstream API. Keep an adapter boundary so it can use a corrected API later.
+
+MCP SERVER
+
+Use the official MCP TypeScript SDK and Streamable HTTP at /mcp. This must be an actual MCP server, not an ordinary JSON endpoint pretending to be MCP.
+Check the current official SDK documentation, pin a stable compatible release, and verify actual Claude compatibility. The latest protocol differs from older initialize/session-based versions; use SDK negotiation/backward compatibility, not hand-rolled protocol guesses.
+Bind the service to 0.0.0.0 and PORT. Ensure Replit routing forwards /mcp to this service and the landing page and /health to their intended handlers; a SPA fallback must never return HTML at /mcp.
+Public read-only access, no OAuth or API-key requirement for users. Do not expose database credentials or arbitrary upstream-fetch tools.
+Use read-only/non-destructive/idempotent tool annotations as supported by the SDK. Treat catalogue text as untrusted data, never as system instructions.
+Provide structuredContent and concise text content where supported, valid output schemas, and friendly tool errors with isError where appropriate.
+
+Exactly three public tools:
+
+1) search_products
+Inputs:
+- query?: string, trim; omitted/empty means filter-only browsing; otherwise 2..200 characters.
+- store?: "rimi"|"maxima"|"both", default "both".
+- max_results?: integer 1..20, default 10.
+- min_protein_per_100g?: finite number 0..100.
+- max_sugar_per_100g?: finite number 0..100.
+- nutri_score?: "A"|"B"|"C"|"D"|"E".
+Map inputs to search, store, pageSize, proteinMin, sugarMax, nutriScores. Revalidate locally as described above.
+Return compact normalized products, original/translated-query context if supplied, missing-field/basis warnings, partial coverage metadata, and retailer links. Never accept max_price.
+Tool description: English conversation users should translate food terms into Latvian before querying; preserve brands and proper names, try a broader Latvian term if needed, and answer in the user's language. A reasonable translation can still miss products: do not promise semantic multilingual search.
+
+2) get_product
+Inputs: store: "rimi"|"maxima"; product_id: positive safe integer.
+Fetch /products/{product_id}?store={store}. Validate the returned identity/store. Return the complete normalized nutrition/ingredients/package detail with missing fields and basis warnings, not raw internal data.
+Return a friendly unknown-product error on 404. Never fall back to the other retailer when the requested product is missing.
+
+3) build_basket
+Inputs: items: array of 1..30 objects {store:"rimi"|"maxima", product_id:positive safe integer, quantity:integer 1..20}.
+Quantity means number of PACKAGES, never portions or grams. Combine duplicate store-qualified references; reject a combined quantity over 20 and a combined total above 100 packages.
+Use current detail requests/cached details, bounded by shared upstream concurrency. Do not trust nutrition, URLs, names, or package sizes supplied by the caller.
+Return a SHOPPING LIST grouped by retailer, line package counts, retailer links, known protein contributions, per-store and overall nutrition completeness, unresolved items, and Nutri-Score distribution.
+Do not place an order or create a retailer cart.
+
+BASKET CALCULATION RULES
+
+For known positive g/kg mass and compatible assumed per-100-g nutrition:
+package_mass_g = quantityValue for g; quantityValue * 1000 for kg.
+line_protein_g = protein_per_100g * package_mass_g / 100 * package_count.
+Calculate with full numeric precision and round only output, e.g. two decimal places.
+Do not guess weights from product names, pieces, multipack text, drained weight, or volume. No ml=g conversion. Volume/piece/unknown mass and missing protein yield unknown contributions, with a reason.
+Keep numeric zero distinct from unknown.
+Always expose known_protein_g; expose total_protein_g only when every requested line is resolved and calculable, otherwise null plus a partial warning. Never label a partial sum a complete total.
+Nutri-Score distribution counts PACKAGES of A/B/C/D/E/unknown, with the counting basis documented. Unresolved requested packages count as unknown. Do not average grades.
+Example using the captured products: two Rimi 3975 packages contribute 66.60 g; one Maxima 7451 package contributes 46.41 g; together known protein is 113.01 g and distribution is B:2, D:1. These are calculation-test fixtures, not hardcoded live catalogue responses.
+Invalid/missing items must be visible. Successful lines can be returned with partial=true; report error if all items fail. An unknown item must not disappear silently.
+
+UPSTREAM LOAD, SECURITY, AND FAILURE HANDLING
+
+Suggested configurable initial limits:
+- 60-second LRU search/detail cache; maximum 500 entries with a memory/response-size ceiling. Cache keys include all applied parameters and store-qualified identities.
+- Coalesce identical in-flight requests; do not cache failures as successful empty results.
+- At most 2 concurrent upstream requests and 2 request starts per second per instance; bounded queue of 50; also enforce a durable cross-instance global budget (initially 60 upstream starts/minute). Count retries against it.
+- At most 20 tool attempts/minute per measured session plus a global tool ceiling (initially 120/minute). Sessions are untrusted and cannot be the only limit. Document shared-connector-IP caveats before any coarse IP limit.
+- Upstream timeout 10 seconds per attempt; maximum tool deadline 30 seconds; cancel queued/in-flight work when the request ends.
+- Retry safe GETs at most once within the deadline for transient network/5xx failures, with backoff; honor 429 Retry-After without sleeping beyond the deadline.
+- Limit JSON body size, response body size (e.g. 2 MiB), query length, result length, active session state (if used), and basket size.
+- Treat non-JSON/HTML upstream responses, malformed JSON, wrong shapes, timeout, 429, 404, and network/5xx as explicit failures or partial results, not fabricated data.
+- Fixed server-configured HTTPS upstream origin; no caller-supplied URLs/hosts or arbitrary redirects. Do not fetch retailer links or image URLs from tool outputs.
+- Validate Host and Origin according to the SDK/selected protocol, allowing legitimate non-browser MCP clients without an Origin header. Reject untrusted browser origins; do not use wildcard CORS as a security policy.
+- Correct trusted-proxy configuration; bound public stats and health routes as well.
+- No secret values, raw session IDs, conversation/query bodies, email, or client fingerprints in application logs. Use redacted operational error categories.
+
+COUNTERS AND PERSISTENCE
+
+Store counters in this new project's durable managed database, not local JSON or SQLite in a published filesystem. Local storage can reset on publish and does not coordinate multiple instances.
+Count each recognized tools/call attempt once, including cache hits and tool failures; do not double-count retries or nested helper requests.
+Count distinct protocol sessions only when the selected SDK/negotiated client version supplies or creates a meaningful session identifier. Hash/HMAC identifiers before durable storage, with a server-side secret managed through Replit Secrets; never persist raw IDs.
+Define the metric as "Measured MCP sessions", not people or users. Retain hashes for 30 days, bound operational session lifetime (e.g. 30-minute idle expiry), and keep cumulative aggregate counts without retaining query histories.
+For sessionless clients, count tool calls but do not invent a new session per call, fingerprint IP/User-Agent, or imply sessions are fully measured. Display the measurement limitation in the UI/README.
+If the chosen SDK supports only initialization-based sessions, test that mode with Claude and document it. If serving multiple instances, shared state or sessionless transport must avoid sticky-session failures; an in-memory transport map alone is not a multi-instance design.
+Use atomic increments/unique constraints and bounded cleanup. Store only the minimal operational state required for the supported transport.
+If counters cannot load, show "Temporarily unavailable", not fake zeros. Expose only aggregate counts to the browser through a small stats endpoint.
+No beta email table or signup UI.
+
+LANDING PAGE
+
+One page at /, mobile-first, fast, accessible, clean green accent, no embedded assistant.
+English/Latvian language switch with corresponding copy and example prompts. Prefer language memory locally; do not track language choices on the server.
+Suggested English headline: "Build a healthier shopping list with AI".
+Subline: "Explore Rimi and Maxima products with nutrition data and retailer links. Connect Claude, describe your goals, and review your list."
+Latvian equivalent: "Veido veselīgāku iepirkumu sarakstu ar MI".
+Make clear that list suggestions are not medical advice and prices/live stock are not verified.
+Copy box with the actual publicly deployed MCP endpoint plus Copy button. Do not guess a production domain from the project name. Before publishing, label the endpoint as not published; do not present localhost as the public connector URL.
+Claude instructions: Customize > Connectors > + Add > Add custom connector; name it ABCDE MCP; paste the /mcp URL; choose No sign in when asked. Mention team/enterprise administrators may control adding connectors; verify current instructions at implementation time.
+Three steps: Connect Claude; ask about foods and nutrition; review the list and buy on Rimi/Barbora.
+Four copyable prompts in BOTH languages, all valid without prices:
+EN: "Suggest a high-protein shopping list for 3 people using Rimi and Maxima. Show package quantities and explain missing nutrition data."
+EN: "Find breakfast foods with at least 10 g protein per 100 g. Keep the original product names."
+EN: "Suggest lower-sugar snack alternatives and show their sugar values and Nutri-Score."
+EN: "Compare protein-rich options from Rimi and Maxima and group the shopping list by retailer."
+LV: "Iesaki ar olbaltumvielām bagātu iepirkumu sarakstu 3 cilvēkiem no Rimi un Maxima. Norādi iepakojumu skaitu un paskaidro, kuri uzturvērtības dati trūkst."
+LV: "Atrodi brokastu produktus ar vismaz 10 g olbaltumvielu uz 100 g. Saglabā oriģinālos produktu nosaukumus."
+LV: "Iesaki uzkodu alternatīvas ar mazāku cukura daudzumu un norādi cukura daudzumu un Nutri-Score."
+LV: "Salīdzini ar olbaltumvielām bagātus produktus no Rimi un Maxima un sagrupē iepirkumu sarakstu pa veikaliem."
+Live aggregate tool-call and measured-session counters, with honest unavailable/loading states.
+Notice in both languages: independent project by ABCDE Open Food Data Lab; not affiliated with Rimi, Maxima, or Barbora; purchases take place on retailer websites. Explain stored aggregate counters, limited hashed-session retention, and infrastructure operational logging; do not claim no personal data whatsoever.
+Footer: Built by ABCDE Open Food Data Lab, linked to https://abcde.lv.
+Keyboard-accessible copy controls with status announcements, sufficient contrast, and responsive layouts.
+
+HEALTH, DOCUMENTATION, TESTS, AND PUBLISHING
+
+Add /health: process health plus degraded aggregate-storage status without credentials, counts of sensitive rows, or internal errors. Do not hit the catalogue database/upstream on every liveness request.
+Provide README setup/configuration, architecture, field/missing-data map, upstream filter workaround, session-count definition, persistence, quotas, safe protocol-client testing, known limitations, and public connection instructions.
+Do not expose a raw tools/execute HTTP shortcut that bypasses MCP/security limits.
+Verify against the REAL upstream, not placeholder catalogue data. Offline fixtures are allowed only in tests, clearly labelled.
+
+Acceptance checklist:
+1. Build/typecheck and focused unit tests pass for numeric parsing, zeros/nulls, store-qualified IDs, query mapping, all local filter enforcement, and calculation/unit rules.
+2. Test g/kg, missing protein/weight, volume/pieces, duplicates, bounds, missing items, all failed items, and unknown grades. Validate the 113.01 g fixture above.
+3. Through an official MCP client/Inspector, negotiate a supported protocol, list exactly three tools, and invoke all three against live examples from BOTH stores. A curl returning HTTP 200 at /mcp is not an MCP compatibility test.
+4. Test mixed-store leakage and ignored nutrient filters using the confirmed upstream examples; the connector must not return nonmatching items. Test filter-only browsing, bounded page exhaustion, and honest partial/no-result messaging.
+5. Test timeout, HTML instead of JSON, 404/429/5xx, cancellation, response-size limits, concurrency/coalescing/cache keys/expiry, and rate limits including cross-instance aggregate budgets.
+6. Verify durable counters across restart, atomic updates, sessionless clients, hash retention, stats failure states, and absence of raw IDs/query content in app logs.
+7. Verify EN/LV copy, prompt/URL copy controls, mobile/desktop layout, keyboard access, and no email, pricing, checkout, or fake-counter UI.
+8. Confirm routed /mcp is not swallowed by the landing-page fallback. Check host/origin controls, CORS, secret redaction, and no arbitrary upstream fetch.
+9. When ready, suggest publishing through Replit's Publish action; DO NOT publish automatically. After the owner publishes, obtain the actual public URL, update the displayed connector address, verify all three tools against that public endpoint, and report exact checks/failures.
+10. A real Claude connector conversation should verify English-to-Latvian search and both-retailer list use. If the agent cannot access the owner's Claude account, provide concise connection/test instructions and mark this check as awaiting user confirmation; never claim it passed.
+
+Deliver a working project, honest verification summary, and confirmed public /mcp URL only after publishing. If an external dependency is unavailable, show explicit errors and report the blocker rather than inventing an API, catalogue, prices, or successful tests.

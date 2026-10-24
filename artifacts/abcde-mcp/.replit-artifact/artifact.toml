@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "ABCDE MCP"
+description = "A bilingual Latvian-English site that connects Claude to ABCDE.lv nutrition data for Rimi and Maxima, with a read-only MCP server and retailer-linked shopping lists."
+version = "1.0.0"
+id = "artifacts/abcde-mcp"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23462
+
+[services.development]
+run = "pnpm --filter @workspace/abcde-mcp run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/abcde-mcp", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/abcde-mcp/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23462"
+BASE_PATH = "/"

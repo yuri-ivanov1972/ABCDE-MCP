@@ -24,6 +24,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /stats:
+    get:
+      operationId: getPublicStats
+      tags: [stats]
+      summary: Get aggregate MCP usage counters
+      description: Returns aggregate tool-call and measured-session counters without individual session identifiers or request contents.
+      responses:
+        "200":
+          description: Aggregate counters are available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicStats"
+        "503":
+          description: Aggregate counters are temporarily unavailable
 components:
   schemas:
     HealthStatus:
@@ -33,4 +48,19 @@ components:
           type: string
       required:
         - status
+    PublicStats:
+      type: object
+      properties:
+        toolCalls:
+          type: integer
+          minimum: 0
+        measuredSessions:
+          type: [integer, "null"]
+          minimum: 0
+        sessionMeasurementAvailable:
+          type: boolean
+      required:
+        - toolCalls
+        - measuredSessions
+        - sessionMeasurementAvailable
 

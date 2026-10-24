@@ -1,8 +1,9 @@
 import express, { type Express } from "express";
-import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import mcpApp from "./lib/mcp/route";
+import publicHealthRouter from "./routes/public-health";
 
 const app: Express = express();
 
@@ -25,10 +26,10 @@ app.use(
     },
   }),
 );
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "32kb" }));
 
 app.use("/api", router);
+app.use(publicHealthRouter);
+app.use(mcpApp);
 
 export default app;
