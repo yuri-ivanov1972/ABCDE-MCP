@@ -97,3 +97,24 @@ For a published release, pass its actual `/mcp` URL to `test:protocol`, then per
 - After the owner republishes, obtain the actual endpoint using deployment metadata, rerun `test:protocol` against it, then verify a real Claude conversation requesting FODMAP-screened products and ingredient evidence. If the connector retains an older tool definition, refresh its tool definitions before retrying.
 - The conservative rule set has not been evaluated against a representative, independently reviewed Latvian/English label corpus. Language/ingredient vocabulary expansion needs sourced rules and regression fixtures, not optimistic guessing.
 - No laboratory FODMAP ratings, safe serving amounts, personalized tolerances or combined-meal FODMAP totals were verified or invented.
+
+## Agent-readable webpage — 2026-10-24
+
+### Passed in development and local production-file checks
+
+- Deployment metadata confirmed the public successful release at `https://abcde-mcp.replit.app`. A read-only GET confirmed the existing `/mcp` route returns its expected method-not-allowed response, not landing-page HTML. No new MCP tool calls were made for this work.
+- Extracted the existing bilingual copy into one source consumed by the interactive page, prerendered HTML and Markdown. Root remains Latvian; English is at `/en/`, and language navigation works with plain links. URL language overrides any stored preference.
+- Landing-page TypeScript checking passed. The production build generated both full HTML pages, bundled assets, both Markdown documents, `llms.txt`, `robots.txt` and `sitemap.xml`.
+- All **10 landing-page regression tests passed**: substantive initial HTML and shared-copy parity for both languages; canonical/language/discovery metadata; language precedence; document content and limits; endpoint validation; generated-file content types/UTF-8/HEAD behavior; real 404s and malformed/method rejection; redirects and resolving hashed asset URLs.
+- HTTP checks through the development proxy returned 200 and the expected content types for `/`, `/en/`, `/content/lv.md`, `/content/en.md`, `/llms.txt`, `/robots.txt` and `/sitemap.xml`. The initial HTML root was populated. `/content/missing.md` returned a plain-text 404 rather than SPA HTML.
+- Headless Chromium checks with JavaScript disabled verified both complete language pages, all four setup steps, all six limitations, linked Markdown and applied CSS.
+- With JavaScript enabled, Chromium verified hydration, language switching and reload, stored selection, real aggregate-counter loading, endpoint and prompt copying into the actual clipboard, accessible success announcements and phone-width navigation without horizontal overflow. The completed pass reported no fresh JavaScript or hydration errors.
+- Desktop Latvian and 390 px English screenshots confirmed the existing cream/green design remains intact.
+- The managed web workflow was restarted after the coherent code/configuration changes and came up cleanly. The API, catalogue, dietary rules, schema and slides were not changed; their suites were not needlessly repeated.
+- Production serving configuration was schema-validated. Generated files use a small Node server with explicit text/Markdown/XML MIME types, correct HEAD responses and no catch-all HTML fallback. The production-server behavior was checked locally by the regression suite.
+
+### Publication remains separate
+
+- No publication was performed. The current public release is not claimed to contain these changes.
+- After owner publication, obtain fresh deployment metadata and check public routing, actual headers, canonical/language links, no-JavaScript page bodies, Markdown/index content, and missing-document 404s. This is particularly important because the web artifact now serves generated files through its own production process rather than the former static SPA catch-all.
+- AI providers may choose not to crawl or index these pages. `llms.txt` is a discovery aid, not a universally supported protocol or a promise of citations.

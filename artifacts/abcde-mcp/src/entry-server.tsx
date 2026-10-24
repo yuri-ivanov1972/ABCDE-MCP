@@ -1,0 +1,108 @@
+import { Children, isValidElement, type ReactNode } from 'react';
+import { renderToString } from 'react-dom/server';
+import App from './App';
+import { ErrorBoundary } from './components/error-boundary';
+import { copyPrompts, translations, type Language } from './page-content';
+import { publicEndpoint, publishedOrigin, sitePath, verifiedMcpEndpoint } from './site-config';
+
+const base = import.meta.env.BASE_URL;
+const endpoint = publicEndpoint(import.meta.env.VITE_PUBLIC_MCP_URL ?? verifiedMcpEndpoint);
+const languages: Language[] = ['lv', 'en'];
+export const pageRoutes = ['', 'en/'];
+
+function text(node: ReactNode): string {
+  return Children.toArray(node).map((child): string => {
+    if (typeof child === 'string' || typeof child === 'number') return String(child);
+    if (!isValidElement<{ children?: ReactNode }>(child)) return '';
+    return child.type === 'br' ? ' ' : text(child.props.children);
+  }).join('');
+}
+
+function escape(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+}
+
+export function pageLanguage(path: string): Language {
+  return path.replace(/\/$/, '') === sitePath(base, 'en').replace(/\/$/, '') ? 'en' : 'lv';
+}
+
+export function renderPage(template: string, path: string): string {
+  const language = pageLanguage(path);
+  const content = translations[language];
+  const title = language === 'lv' ? 'ABCDE MCP — pārtikas dati un iepirkumu saraksti' : 'ABCDE MCP — food data and smarter shopping lists';
+  const canonical = new URL(sitePath(base, language === 'en' ? 'en/' : ''), publishedOrigin).href;
+  const head = [
+    `<title>${escape(title)}</title>`,
+    `<meta name="description" content="${escape(content.intro)}">`,
+    '<meta name="robots" content="index, follow">',
+    `<meta property="og:title" content="${escape(title)}">`,
+    `<meta property="og:description" content="${escape(content.intro)}">`,
+    '<meta property="og:type" content="website">',
+    `<meta property="og:locale" content="${language === 'lv' ? 'lv_LV' : 'en_US'}">`,
+    '<meta name="twitter:card" content="summary">',
+    `<meta name="twitter:title" content="${escape(title)}">`,
+    `<meta name="twitter:description" content="${escape(content.intro)}">`,
+    `<link rel="alternate" type="text/markdown" hreflang="${language}" href="${sitePath(base, `content/${language}.md`)}" title="ABCDE MCP — Markdown">`,
+    `<link rel="alternate" type="text/plain" href="${sitePath(base, 'llms.txt')}" title="AI agent content index">`,
+    ...(publishedOrigin ? [
+      `<link rel="canonical" href="${canonical}">`,
+      `<meta property="og:url" content="${canonical}">`,
+      ...languages.map((lang) => `<link rel="alternate" hreflang="${lang}" href="${new URL(sitePath(base, lang === 'en' ? 'en/' : ''), publishedOrigin).href}">`),
+      `<link rel="alternate" hreflang="x-default" href="${new URL(sitePath(base), publishedOrigin).href}">`,
+      `<link rel="sitemap" type="application/xml" href="${sitePath(base, 'sitemap.xml')}">`,
+    ] : []),
+  ].join('\n    ');
+  const markup = renderToString(<ErrorBoundary><App ssrPath={path} /></ErrorBoundary>);
+  return template.replace(/<html lang="[^"]*"/, `<html lang="${language}"`)
+    .replace('<!--page-head-->', () => head).replace('<!--page-html-->', () => markup);
+}
+
+export function markdown(language: Language): string {
+  const c = translations[language];
+  return [
+    '# ABCDE MCP', '', text(c.heading), '', c.eyebrow, '', c.intro, '',
+    `[${c.heroLink}](${sitePath(base, language === 'en' ? 'en/#connect' : '#connect')})`,
+    '', c.visualCaption, '', `## ${c.stepsTitle}`, '', c.stepsIntro, '',
+    ...c.steps.flatMap(([title, description], index) => [`${index + 1}. **${title}** — ${description}`, '']),
+    `## ${c.setupTitle}`, '', c.setupIntro, '', `${c.endpointLabel}: ${endpoint || c.endpointMissing}`, '',
+    ...c.stepsSetup.map((step, index) => `${index + 1}. ${text(step)}`),
+    '', c.adminNote, '', `## ${c.promptsTitle}`, '', c.promptsIntro, '',
+    ...copyPrompts[language].flatMap((prompt) => [`- ${prompt}`, '']),
+    `## ${c.limitsTitle}`, '', ...c.limitations.map((limit) => `- ${text(limit)}`), '',
+    `## ${c.usageTitle}`, '', c.toolCalls, '', c.toolCallsCaption, '', c.statsUnavailable, '',
+    c.statsStaticNote,
+    '', `${c.sessions}: ${c.sessionless}`, '', c.sessionsCaption, '', c.privacy, '',
+    `${c.footer} · [abcde.lv](https://abcde.lv)`, '', c.footerTag, '',
+    `[LV](${sitePath(base)}) · [EN](${sitePath(base, 'en/')}) · [llms.txt](${sitePath(base, 'llms.txt')})`, '',
+  ].join('\n');
+}
+
+export function agentDocuments(): Record<string, { type: string; body: string }> {
+  const url = (path: string) => publishedOrigin ? new URL(sitePath(base, path), publishedOrigin).href : sitePath(base, path);
+  return {
+    'content/lv.md': { type: 'text/markdown; charset=utf-8', body: markdown('lv') },
+    'content/en.md': { type: 'text/markdown; charset=utf-8', body: markdown('en') },
+    'llms.txt': {
+      type: 'text/plain; charset=utf-8',
+      body: [
+        '# ABCDE MCP', '', `> ${translations.en.intro}`, '',
+        'Independent, public, read-only project by ABCDE Open Food Data Lab. Purchases happen on retailer websites.',
+        'This index follows the voluntary llms.txt discovery convention; support by any particular AI service is not guaranteed.', '',
+        '## Website content', '',
+        `- [Latvian page](${url('')})`,
+        `- [English page](${url('en/')})`,
+        `- [Latvian content — Markdown](${url('content/lv.md')})`,
+        `- [English content — Markdown](${url('content/en.md')})`,
+        ...(endpoint ? ['', '## MCP connection', '', `- [Public MCP endpoint](${endpoint}): Streamable HTTP, not an HTML content page. No sign-in required.`] : []),
+        '', 'Read the content documents for connection instructions, examples, limitations, independence and privacy information.',
+        'No verified prices, guaranteed live stock, medical advice or allergen guarantees. No carts, orders or checkout.',
+        'No queries or session IDs are stored by the application. Infrastructure operational logs may exist.', '',
+      ].join('\n'),
+    },
+    'robots.txt': { type: 'text/plain; charset=utf-8', body: `User-agent: *\nAllow: /\n${publishedOrigin ? `Sitemap: ${url('sitemap.xml')}\n` : ''}` },
+    ...(publishedOrigin ? { 'sitemap.xml': {
+      type: 'application/xml; charset=utf-8',
+      body: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pageRoutes.map((path) => `  <url><loc>${escape(url(path))}</loc></url>`).join('\n')}\n</urlset>\n`,
+    } } : {}),
+  };
+}

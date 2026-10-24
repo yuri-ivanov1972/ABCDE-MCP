@@ -16,12 +16,7 @@ run = "pnpm --filter @workspace/abcde-mcp run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/abcde-mcp", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/abcde-mcp/dist/public"
-
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+run = [ "node", "artifacts/abcde-mcp/scripts/serve.mjs" ]
 
 [services.env]
 PORT = "23462"

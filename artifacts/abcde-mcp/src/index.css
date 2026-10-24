@@ -370,11 +370,11 @@ button { font: inherit; }
   display: inline-flex; align-items: center; gap: 3px; padding: 4px;
   border: 1px solid var(--line); border-radius: 99px; background: #fbfaf4;
 }
-.language-switch button {
+.language-switch a {
   border: 0; border-radius: 99px; padding: 8px 12px; background: transparent;
-  color: #647168; cursor: pointer; font-size: 12px; font-weight: 700; transition: background .18s, color .18s;
+  color: #647168; cursor: pointer; font-size: 12px; font-weight: 700; text-decoration: none; transition: background .18s, color .18s;
 }
-.language-switch button[aria-pressed="true"] { color: #fffaf0; background: var(--green); }
+.language-switch a[aria-current="page"] { color: #fffaf0; background: var(--green); }
 .hero {
   width: min(1200px, calc(100% - 64px)); margin: 0 auto;
   display: grid; grid-template-columns: minmax(0, 1.16fr) minmax(330px, .84fr);
@@ -539,7 +539,7 @@ button { font: inherit; }
   .topbar { height: 72px; }
   .brand-note { display: none; }
   .brand-name { font-size: 15px; }
-  .language-switch button { padding: 7px 9px; }
+  .language-switch a { padding: 7px 9px; }
   .hero { padding: 48px 0 49px; }
   .hero h1 { font-size: clamp(42px, 12vw, 58px); margin-top: 18px; }
   .hero-copy { font-size: 15px; }

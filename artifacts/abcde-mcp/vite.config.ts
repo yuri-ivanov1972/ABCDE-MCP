@@ -2,6 +2,7 @@ import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { agentPages } from './scripts/agent-pages.mjs';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
@@ -29,7 +30,10 @@ if (!basePath) {
 
 export default defineConfig({
   base: basePath,
+  appType: 'mpa',
+  ssr: { noExternal: ['@workspace/api-client-react'] },
   plugins: [
+    agentPages(),
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),

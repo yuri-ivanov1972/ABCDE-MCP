@@ -23,14 +23,18 @@ The API service is started by its configured Replit workflow. The landing page i
 | --- | --- | --- |
 | `ABCDE_API_URL` | Fixed server-side ABCDE.lv API base URL | `https://abcde.lv/api` |
 | `PUBLIC_MCP_URL` | Optional public connector address for host validation | Unset until a real published URL is known |
-| `VITE_PUBLIC_MCP_URL` | Optional public connector address displayed on the landing page | Unset; page says not published |
+| `VITE_PUBLIC_MCP_URL` | Optional public connector address displayed on the landing page and agent documents | Verified published endpoint in the shared site configuration; an explicitly invalid/empty override displays unavailable |
 | `DATABASE_URL` | This project's managed PostgreSQL database | Provided by Replit |
 
 Catalogue requests currently need no API key. Do not add `ABCDE_API_KEY`, `RIMI_DATABASE_URL`, or `MAXIMA_DATABASE_URL` unless the upstream contract changes and the project owner separately approves it. `PUBLIC_MCP_URL` and `VITE_PUBLIC_MCP_URL` are ordinary configuration values, not secrets. Never put catalogue credentials or database credentials into this project.
 
 ## Architecture and routes
 
-- `/` — bilingual landing page, Latvian by default; language preference stays in local browser storage.
+- `/` — Latvian landing page, with complete HTML before JavaScript.
+- `/en/` — English landing page; `/en` redirects here. The language switch uses normal links and works without JavaScript. Explicit language URLs take precedence over the browser's stored preference; the current selection is still recorded locally.
+- `/content/lv.md`, `/content/en.md` — complete shared landing-page copy as UTF-8 Markdown.
+- `/llms.txt` — voluntary AI-agent discovery index, linking to both human pages, both Markdown documents and the configured public MCP endpoint. Not a guarantee of indexing or support by every AI provider.
+- `/robots.txt`, `/sitemap.xml` — permissive crawl policy and the two canonical language pages.
 - `/mcp` — official MCP TypeScript SDK Streamable HTTP endpoint. The SDK handles protocol negotiation; application code does not implement JSON-RPC by hand.
 - `/api/stats` — aggregate counters only. It returns `503` with a generic unavailable message if storage cannot be queried.
 - `/health` — process health and aggregate-storage status; it does not call the catalogue API.
@@ -159,6 +163,29 @@ After connecting, try:
 The project owner should verify a real Claude conversation after connecting. The server can be protocol-tested with an official MCP client/Inspector, but that alone does not prove a real Claude account can connect.
 
 ## Verification
+
+### Agent-readable landing page
+
+The bilingual copy lives in `artifacts/abcde-mcp/src/page-content.tsx`. Edit it once: the interactive React page, initial HTML and Markdown documents all consume that source. The shared server entry produces page metadata and the agent documents. Avoid separate bot-only text or User-Agent-dependent pages.
+
+The normal build first bundles browser assets, then prerenders the same React page into Latvian and English HTML and generates the documents. Development uses the same renderer. CSS is linked directly in the HTML, so a JavaScript-disabled browser still gets the design. React hydrates the existing content; counters fetch only after mounting. Initial HTML reports counters as unavailable, and text documents never publish frozen counts.
+
+The published origin in `src/site-config.ts` was verified through deployment metadata as `https://abcde-mcp.replit.app` on 24 October 2026. Its `/mcp` route was confirmed present. Re-check deployment metadata before changing that public origin or moving domains; never substitute a development URL. The public endpoint has a shared validated override, so human and agent documents show the same connection address.
+
+Production uses a small Node file server for the **generated files**, not runtime server rendering or the Vite development server. This replaces the former catch-all static SPA rewrite so Markdown/XML/text receive explicit MIME types and missing documents return actual 404s. It binds to the managed `PORT`; existing API/MCP routing remains separate. Hashed assets are immutable-cacheable; content documents revalidate. The artifact configuration change has been schema-validated but has not been published by the agent.
+
+Reproduce the relevant checks (the build command needs the artifact's non-secret service configuration when run outside its managed workflow):
+
+```sh
+PORT=23462 BASE_PATH=/ pnpm --filter @workspace/abcde-mcp run build
+pnpm --filter @workspace/abcde-mcp run typecheck
+pnpm --filter @workspace/abcde-mcp run test
+node artifacts/abcde-mcp/scripts/browser-check.mjs http://127.0.0.1:80
+```
+
+Run the browser check only against a running development proxy. It uses the workspace Chromium, checks both languages with JavaScript disabled, then verifies hydration, language navigation/reload, live counters, real clipboard contents, announcements and phone-width overflow. The Node regression suite checks shared copy, metadata/discovery, endpoint validation, built-file responses, MIME types, redirects, asset links and missing-file behavior without changing MCP counters or querying the catalogue.
+
+After the owner republishes, verify the actual public routes and headers again. A development fetch cannot establish that an outside agent can reach the newly published release. No AI indexing or citations are promised.
 
 The unit suite covers strict numeric parsing, zero/null behavior, store-qualified IDs, query mapping, local filter enforcement, duplicate basket references, mass conversions, missing products, and the 113.01 g calculation. Live upstream and official MCP client checks should be rerun as part of release readiness. A `200` from `/mcp` alone is not an MCP compatibility check.
 
