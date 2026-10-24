@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/abcde-mcp-overview/"
+title = "ABCDE MCP — Project Overview"
+description = "An eight-slide English overview of ABCDE MCP: its read-only tools, architecture, nutrition limitations, basket calculations, safeguards, verification results, and next launch steps."
+version = "1.0.0"
+id = "artifacts/abcde-mcp-overview"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/abcde-mcp-overview/" ]
+localPort = 20400
+
+[services.development]
+run = "pnpm --filter @workspace/abcde-mcp-overview run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/abcde-mcp-overview", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/abcde-mcp-overview/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20400"
+BASE_PATH = "/abcde-mcp-overview/"

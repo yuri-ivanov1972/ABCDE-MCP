@@ -1,0 +1,10 @@
+[
+  {"id":"b7bb8f91-670e-49a8-9152-cf709c09fc01","position":1,"filepath":"src/pages/slides/Cover.tsx","title":"ABCDE MCP","description":"Nutrition-aware shopping lists with Claude; development-verified and publication pending.","speakerNotes":""},
+  {"id":"b7bb8f91-670e-49a8-9152-cf709c09fc02","position":2,"filepath":"src/pages/slides/Workflow.tsx","title":"From a food question to a shopping list","description":"Connect, ask, review, and follow retailer links.","speakerNotes":""},
+  {"id":"b7bb8f91-670e-49a8-9152-cf709c09fc03","position":3,"filepath":"src/pages/slides/Tools.tsx","title":"Three tools. One read-only workflow.","description":"The three read-only MCP tools and excluded actions.","speakerNotes":""},
+  {"id":"b7bb8f91-670e-49a8-9152-cf709c09fc04","position":4,"filepath":"src/pages/slides/Architecture.tsx","title":"Claude is the interface. ABCDE.lv is the source.","description":"The MCP, catalogue, normalization, PostgreSQL, and landing-page architecture.","speakerNotes":""},
+  {"id":"b7bb8f91-670e-49a8-9152-cf709c09fc05","position":5,"filepath":"src/pages/slides/DataLimits.tsx","title":"Useful nutrition data—with explicit limits","description":"Original names, missing values, uncertain bases, bounded searches, and safety limits.","speakerNotes":""},
+  {"id":"b7bb8f91-670e-49a8-9152-cf709c09fc06","position":6,"filepath":"src/pages/slides/Calculation.tsx","title":"113.01 g of protein. Calculated transparently.","description":"The live-verified package protein example and partial-total behavior.","speakerNotes":""},
+  {"id":"b7bb8f91-670e-49a8-9152-cf709c09fc07","position":7,"filepath":"src/pages/slides/Safeguards.tsx","title":"Bounded requests. Minimal application data.","description":"Cache, quotas, timeouts, request safeguards, and privacy.","speakerNotes":""},
+  {"id":"b7bb8f91-670e-49a8-9152-cf709c09fc08","position":8,"filepath":"src/pages/slides/LaunchStatus.tsx","title":"Built and tested. Public launch comes next.","description":"Passed development checks, remaining launch checks, and retailer independence.","speakerNotes":""}
+]
