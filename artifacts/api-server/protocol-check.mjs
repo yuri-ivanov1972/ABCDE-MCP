@@ -24,7 +24,18 @@ async function invoke(client, name, args, expectError = false) {
   calls++;
   const result = await client.callTool({ name, arguments: args });
   assert.equal(Boolean(result.isError), expectError, `${name}: ${JSON.stringify(result.content)}`);
-  if (!expectError) assert.ok(result.structuredContent);
+  const textBlocks = result.content.filter((block) => block.type === "text");
+  assert.ok(textBlocks.length > 0, `${name}: model-visible text is required`);
+  if (!expectError) {
+    assert.ok(result.structuredContent);
+    assert.equal(textBlocks.length, 2, `${name}: summary and complete JSON text`);
+    assert.ok(textBlocks[0].text.length > 0);
+    assert.deepEqual(JSON.parse(textBlocks[1].text), result.structuredContent,
+      `${name}: text-only consumers must receive every structured field`);
+    assert.ok(Buffer.byteLength(JSON.stringify(result), "utf8") <= 256 * 1024);
+  } else {
+    assert.equal(result.structuredContent, undefined);
+  }
   return result.structuredContent;
 }
 
@@ -39,7 +50,6 @@ for (const mode of ["legacy", "auto"]) {
     ]);
     assert.ok(tools.every((tool) => tool.annotations?.readOnlyHint === true));
     console.log(`PASS ${mode}: official SDK negotiation and exactly three read-only tools`);
-    if (mode === "legacy") continue;
 
     const rimi = await invoke(client, "get_product", { store: "rimi", product_id: 3975 });
     const maxima = await invoke(client, "get_product", { store: "maxima", product_id: 7451 });
@@ -108,6 +118,7 @@ for (const mode of ["legacy", "auto"]) {
       ],
     }, true);
     console.log("PASS missing product, partial basket, all-failed basket, and duplicate quantity limit");
+    console.log(`PASS ${mode}: all three tools expose complete, equivalent text and structured data`);
   } finally {
     await client.close();
   }
@@ -123,4 +134,5 @@ assert.deepEqual(Object.keys(after).sort(), [
   "measuredSessions", "sessionMeasurementAvailable", "toolCalls",
 ]);
 console.log(`PASS aggregate counter includes all ${calls} tool attempts, including cache hits and failures`);
-console.log("NOT TESTED: real Claude account connection and the eventual published URL.");
+console.log(`Verified endpoint: ${endpoint.href}`);
+console.log("NOT TESTED: real Claude account conversation. Development endpoint results do not verify a published release.");

@@ -99,7 +99,8 @@ Shopping-list suggestions are not medical advice. Ingredient data and analysis d
 - Database-backed shared limits: 60 upstream request starts/minute and 120 MCP tool attempts/minute across instances.
 - Upstream GET timeout is 10 seconds per attempt; one retry is allowed for eligible transient failures within a 30-second tool deadline. A `429` retry uses `Retry-After` only when it fits the deadline.
 - Upstream response bodies are capped at 2 MiB; MCP request bodies are capped at 32 KiB; search and basket sizes are bounded by tool schemas.
-- Structured tool results are capped at 256 KiB; larger results fail explicitly rather than returning a truncated or misleading payload.
+- Successful tools return a short summary followed by a complete JSON text block, alongside equivalent `structuredContent`. Clients that only expose text content to the model therefore still receive product details and basket data.
+- Entire serialized tool results are capped at 256 KiB, counting both data representations, JSON escaping, summaries, and content-block overhead. Larger results fail explicitly rather than returning truncated or misleading data.
 - Only fixed HTTPS upstream configuration is accepted; redirects and caller-supplied upstream hosts are rejected.
 - Non-JSON responses, invalid shapes, network failures, timeouts, `404`, `429`, and `5xx` are explicit errors or partial results, never fabricated catalogue data.
 - Host and Origin validation is provided by the official MCP Express SDK and configured for the known Replit/public hosts plus Claude's origins. Requests without an Origin header are accepted for non-browser clients.

@@ -1,8 +1,8 @@
 # Verification record
 
-Checked in the development workspace on 2026-10-24. No production deployment was performed.
+Initial development baseline checked on 2026-10-24. The owner subsequently published the project. The later production diagnosis and development-only compatibility fix are recorded below; this record does not claim the fix has been published.
 
-## Passed
+## Initial development baseline — passed
 
 - Full pnpm workspace TypeScript checks.
 - Production landing-page build and API service build/start.
@@ -26,7 +26,7 @@ Checked in the development workspace on 2026-10-24. No production deployment was
 - Untrusted Host/Origin rejection, malformed MCP JSON, and oversized MCP request rejection.
 - Desktop and 390 px mobile page captures render correctly without fresh browser errors. The unpublished endpoint remains unavailable for copying.
 
-## Not yet verified
+## Initial development baseline — not yet verified
 
 - The eventual published URL and production routing/migrations.
 - A real Claude account adding and using the connector.
@@ -34,6 +34,33 @@ Checked in the development workspace on 2026-10-24. No production deployment was
 - Manual screen-reader/keyboard and real-browser clipboard testing. Copy controls and live status announcements are implemented; screenshots do not verify clipboard interactions.
 
 Usage totals include real development verification calls. They are not fabricated launch statistics or unique-user counts.
+
+## Claude text-result compatibility — 2026-10-24
+
+### Observed on the published release before the fix
+
+- Deployment metadata confirmed a public, successful autoscale release at `https://abcde-mcp.replit.app`.
+- The owner reported adding `https://abcde-mcp.replit.app/mcp` to Claude, but Claude could see only search-summary sentences, not specific products.
+- A read-only official-client check using legacy negotiation confirmed all three tools were available. A Rimi search for `auzu` returned two real products with IDs, original names, nutrition, and retailer links in `structuredContent`, but text `content` contained only a summary.
+- This establishes a server response compatibility gap consistent with the owner's Claude report, not a failure to connect. It does not independently prove how Claude internally processes structured results.
+
+### Fixed and verified in development
+
+- All successful tools now return a summary plus a separate complete JSON text block, in addition to their unchanged structured data. Names, identifiers, links, numeric zero, unknown/null values, warnings, and partial totals are preserved.
+- The 256 KiB bound now measures the entire serialized result object, including both representations, JSON escaping, the summary, and content-block overhead. Oversized responses produce an explicit error, not truncated product data.
+- All 27 automated tests passed, including seven new serializer regression tests: search, empty search, detail with missing nutrition, partial basket, explicit error, exact byte boundary, and duplicate/escaped/UTF-8 payload limits.
+- The API service TypeScript check passed. Its production bundle built successfully as part of the managed development workflow restart, and the service started cleanly.
+- Official-client checks against the development `/mcp` endpoint passed for both legacy initialization and modern automatic negotiation. Each mode exercised all three tools and compared the complete JSON text block with structured data.
+- The development checks included the 113.01 g complete basket, empty filtered search, partial basket, missing products, all-failed basket, and duplicate quantity errors. All 22 actual tool attempts were reflected in aggregate counters; counters were not reset.
+- Whole-workspace TypeScript checking was attempted but is blocked by existing nullable-reduction errors in the slides artifact's `src/widgets/ImportedChart.tsx` (line 78). The API, landing page, mockup sandbox, and scripts checks passed. No slide files were changed for this fix.
+
+### Publication and real Claude confirmation still pending
+
+1. The owner must republish the updated code. Restarting a development workflow does not update the published endpoint.
+2. After publication, obtain the actual published URL from deployment metadata and run the updated protocol checks against its `/mcp` endpoint.
+3. Start a new Claude conversation with the connected ABCDE MCP tool enabled and repeat “I want you to suggest me healthy products from Rimi”. Confirm that Claude uses actual product names and nutrition data rather than category-only guesses. Record the owner's observed result; do not claim access to their account.
+
+No production deployment or real Claude conversation was performed as part of this fix.
 
 ## Re-run
 

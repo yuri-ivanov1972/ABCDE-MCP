@@ -15,6 +15,7 @@ import {
   type Store,
 } from "./domain";
 import { recordToolAttempt } from "./metrics";
+import { errorResult, jsonToolResult } from "./tool-result";
 import {
   currentMcpRequestSignal,
   takeRecordedToolAttempt,
@@ -164,16 +165,6 @@ const basketInputSchema = z
   })
   .strict();
 
-function jsonToolResult<T>(value: T, summary: string) {
-  if (Buffer.byteLength(JSON.stringify(value), "utf8") > 256 * 1024) {
-    return errorResult("The verified result is too large. Request fewer products or a smaller basket.");
-  }
-  return {
-    content: [{ type: "text" as const, text: summary }],
-    structuredContent: value as Record<string, unknown>,
-  };
-}
-
 function friendlyCatalogueError(error: unknown): string {
   if (error instanceof CatalogueError) {
     switch (error.kind) {
@@ -197,13 +188,6 @@ function friendlyCatalogueError(error: unknown): string {
     return "This request reached its time limit. Try a smaller search or basket.";
   }
   return "The request could not be completed safely. Please try again.";
-}
-
-function errorResult(message: string) {
-  return {
-    isError: true,
-    content: [{ type: "text" as const, text: message }],
-  };
 }
 
 async function prepareTool(
@@ -300,7 +284,7 @@ export function createMcpServer(): McpServer {
         );
         return jsonToolResult(
           product,
-          `Verified product ${product.product_id} at ${product.store}. Nutrition values, package details, and missing-field warnings are included in structured data.`,
+          `Verified product ${product.product_id} at ${product.store}. Nutrition values, package details, and missing-field warnings are included below and in structured data.`,
         );
       } catch (error) {
         return errorResult(friendlyCatalogueError(error));
