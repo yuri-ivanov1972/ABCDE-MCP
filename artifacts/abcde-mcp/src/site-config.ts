@@ -1,5 +1,6 @@
 // Verified through deployment metadata on 2026-10-24. Never derive this from a dev host.
 export const publishedOrigin = 'https://abcde-mcp.replit.app';
+// Authoritative connection address for both the webpage and agent documents; no environment override.
 export const verifiedMcpEndpoint = `${publishedOrigin}/mcp`;
 
 export function publicEndpoint(value: string | undefined): string {

@@ -23,7 +23,7 @@ The API service is started by its configured Replit workflow. The landing page i
 | --- | --- | --- |
 | `ABCDE_API_URL` | Fixed server-side ABCDE.lv API base URL | `https://abcde.lv/api` |
 | `PUBLIC_MCP_URL` | Optional public connector address for host validation | Unset until a real published URL is known |
-| `VITE_PUBLIC_MCP_URL` | Optional public connector address displayed on the landing page and agent documents | Verified published endpoint in the shared site configuration; an explicitly invalid/empty override displays unavailable |
+| `VITE_PUBLIC_MCP_URL` | Legacy setting; ignored by the landing page and agent documents | Connection instructions always use `https://abcde-mcp.replit.app/mcp` from the shared site configuration |
 | `DATABASE_URL` | This project's managed PostgreSQL database | Provided by Replit |
 
 Catalogue requests currently need no API key. Do not add `ABCDE_API_KEY`, `RIMI_DATABASE_URL`, or `MAXIMA_DATABASE_URL` unless the upstream contract changes and the project owner separately approves it. `PUBLIC_MCP_URL` and `VITE_PUBLIC_MCP_URL` are ordinary configuration values, not secrets. Never put catalogue credentials or database credentials into this project.

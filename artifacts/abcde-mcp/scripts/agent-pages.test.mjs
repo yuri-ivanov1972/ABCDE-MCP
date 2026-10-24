@@ -13,6 +13,7 @@ let vite, renderer, content, config, template, production, address;
 before(async () => {
   vite = await createServer({
     configFile: false, root, base: '/', plugins: [react()],
+    define: { 'import.meta.env.VITE_PUBLIC_MCP_URL': JSON.stringify('https://obsolete.example/mcp') },
     resolve: { alias: { '@': path.join(root, 'src') } },
     ssr: { noExternal: ['@workspace/api-client-react'] },
     server: { middlewareMode: true, hmr: false, watch: null },
@@ -94,6 +95,26 @@ test('agent documents contain shared content, not snapshots or unsupported promi
   assert.equal((documents['sitemap.xml'].body.match(/<loc>/g) ?? []).length, 2);
   assert.equal(documents['sitemap.xml'].body.includes('/api/'), false);
   assert.equal(documents['sitemap.xml'].body.includes('/mcp'), false);
+});
+
+test('the real connection address wins over obsolete configuration everywhere', async () => {
+  const expected = 'https://abcde-mcp.replit.app/mcp';
+  assert.equal(config.verifiedMcpEndpoint, expected);
+  for (const route of ['/', '/en/']) {
+    const html = renderer.renderPage(template, route);
+    assert.ok(html.includes(`data-testid="text-public-endpoint">${expected}</code>`));
+    assert.ok(html.includes('data-testid="button-copy-endpoint"'));
+    assert.equal(html.includes('obsolete.example'), false);
+  }
+  for (const name of ['content/lv.md', 'content/en.md', 'llms.txt']) {
+    const body = renderer.agentDocuments()[name].body;
+    assert.ok(body.includes(expected), name);
+    assert.equal(body.includes('obsolete.example'), false);
+  }
+  // The displayed value and clipboard handler must use the same authoritative value.
+  const app = await readFile(path.join(root, 'src/App.tsx'), 'utf8');
+  assert.match(app, /const endpoint = verifiedMcpEndpoint;/);
+  assert.match(app, /onClick=\{\(\) => copyText\(endpoint,/);
 });
 
 test('endpoint configuration rejects private/dev addresses, credentials and query parameters', () => {

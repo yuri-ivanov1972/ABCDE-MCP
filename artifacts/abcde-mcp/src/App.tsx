@@ -8,7 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { copyPrompts, translations, type Language } from './page-content';
-import { publicEndpoint, sitePath, verifiedMcpEndpoint } from './site-config';
+import { sitePath, verifiedMcpEndpoint } from './site-config';
 
 const queryClient = new QueryClient();
 function Home({ language }: { language: Language }) {
@@ -19,7 +19,7 @@ function Home({ language }: { language: Language }) {
     query: { queryKey: getGetPublicStatsQueryKey(), refetchInterval: 30_000, enabled: mounted },
   });
   const content = translations[language];
-  const endpoint = publicEndpoint(import.meta.env.VITE_PUBLIC_MCP_URL ?? verifiedMcpEndpoint);
+  const endpoint = verifiedMcpEndpoint;
   const base = import.meta.env.BASE_URL;
 
   useEffect(() => {

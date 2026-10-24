@@ -3,10 +3,10 @@ import { renderToString } from 'react-dom/server';
 import App from './App';
 import { ErrorBoundary } from './components/error-boundary';
 import { copyPrompts, translations, type Language } from './page-content';
-import { publicEndpoint, publishedOrigin, sitePath, verifiedMcpEndpoint } from './site-config';
+import { publishedOrigin, sitePath, verifiedMcpEndpoint } from './site-config';
 
 const base = import.meta.env.BASE_URL;
-const endpoint = publicEndpoint(import.meta.env.VITE_PUBLIC_MCP_URL ?? verifiedMcpEndpoint);
+const endpoint = verifiedMcpEndpoint;
 const languages: Language[] = ['lv', 'en'];
 export const pageRoutes = ['', 'en/'];
 
