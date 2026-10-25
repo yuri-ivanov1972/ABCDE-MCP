@@ -21,6 +21,16 @@ The owner wants `https://abcde.lv/mcp` as the primary Claude connection address,
 
 **How to apply:** Keep displayed instructions, clipboard output and generated documents aligned. Verify a real MCP route on the main domain before promoting it in public instructions; ordinary successful HTML is not proof of MCP support. Retain backward compatibility for existing Claude connections.
 
+The owner confirmed on 25 October 2026 that Claude returned actual product
+details through `https://abcde.lv/mcp` and approved making it the advertised address.
+
+**Why:** This is owner-observed Claude acceptance, not an inference from SDK
+tests. It satisfies the agreed manual acceptance gate for this migration.
+
+**How to apply:** Keep the main-domain address primary and the direct address
+working. Do not repeatedly ask for the same migration confirmation; require
+fresh acceptance only for a material future compatibility change.
+
 Keep the machine-endpoint proxy separate from the human-page proxy, and keep
 dual-host server trust independent of which address is advertised.
 

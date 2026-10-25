@@ -2,6 +2,15 @@
 
 ## Scope and current status
 
+**Update — 25 October 2026:** The owner reports both projects published. Direct
+official-client checks passed on both public MCP addresses, including both
+negotiation modes and live calls to all three tools with complete product data.
+The owner also confirmed that Claude returned actual product details using
+https://abcde.lv/mcp. This workspace now selects that address for its landing
+page and AI documents; publishing that final instructions change remains a
+separate owner action. The staged instructions below also serve as the rollout
+and recovery reference, not a claim that earlier pending steps remain undone.
+
 This handoff is for the **separate abcde.lv Replit project**. Its source is not
 present in the MCP workspace, and it has not been edited or published by this work.
 The owner confirms the human pages are already live:
@@ -134,8 +143,8 @@ The human-page proxy and machine-endpoint proxy must coexist.
    ```
 
    This one allowlisted build-time setting feeds human HTML, browser clipboard
-   output, both Markdown documents and llms.txt. It currently retains the working
-   old address. It is not an environment variable, secret, Host allowlist or proxy
+    output, both Markdown documents and llms.txt. It now selects the main-domain
+    address after public checks and owner Claude confirmation. It is not an environment variable, secret, Host allowlist or proxy
    destination. Do not set obsolete `VITE_PUBLIC_MCP_URL` or perform string
    replacement on proxied HTML.
 6. Rebuild and verify both languages, hydration and exact clipboard output, then
@@ -190,8 +199,9 @@ pnpm --filter @workspace/api-server run test:proxy-protocol
 ```
 
 The latter explicitly makes a small number of live catalogue/tool calls and
-compares direct/proxied SDK negotiation. It defaults to the development shared
-gateway, not the public site. To check a public target with that SDK script:
+compares direct/proxied SDK negotiation when run without arguments. It defaults
+to the development shared gateway, not the public site. Public targets are
+checked directly, without adding a second local proxy. To check a public target:
 
 ```sh
 cd artifacts/api-server

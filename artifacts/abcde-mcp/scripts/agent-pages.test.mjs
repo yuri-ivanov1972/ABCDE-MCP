@@ -143,7 +143,7 @@ test('agent documents contain shared content, not snapshots or unsupported promi
 });
 
 test('the real connection address wins over obsolete configuration everywhere', async () => {
-  const expected = 'https://abcde-mcp.replit.app/mcp';
+  const expected = JSON.parse(await readFile(path.join(root, 'src/connection.json'), 'utf8')).primaryEndpoint;
   assert.equal(config.verifiedMcpEndpoint, expected);
   for (const route of ['/', '/en/', '/lv/mcp', '/en/mcp']) {
     const html = renderer.renderPage(template, route);
@@ -162,17 +162,22 @@ test('the real connection address wins over obsolete configuration everywhere', 
   assert.match(app, /onClick=\{\(\) => copyText\(endpoint,/);
 });
 
-test('promotion uses one validated setting for both HTML languages and all agent documents', async () => {
-  assert.equal(config.selectPrimaryEndpoint('https://abcde.lv/mcp'), 'https://abcde.lv/mcp');
+test('invalid primary addresses fail rather than changing public instructions', () => {
   for (const value of ['', null, 'https://evil.example/mcp', 'https://abcde.lv/mcp/',
     'http://abcde.lv/mcp', 'https://abcde.lv/mcp?key=x']) {
     assert.throws(() => config.selectPrimaryEndpoint(value));
   }
+});
+
+for (const expected of ['https://abcde.lv/mcp', 'https://abcde-mcp.replit.app/mcp']) {
+test(`approved primary ${expected} is shared by all HTML and agent documents`, async () => {
+  assert.equal(config.selectPrimaryEndpoint(expected), expected);
+  const other = expected === config.mainSiteMcpEndpoint ? config.directMcpEndpoint : config.mainSiteMcpEndpoint;
   const directory = await mkdtemp(path.join(tmpdir(), 'abcde-connection-test-'));
   const fixture = path.join(directory, 'connection.json');
   let promoted;
   try {
-    await writeFile(fixture, '{"primaryEndpoint":"https://abcde.lv/mcp"}');
+    await writeFile(fixture, JSON.stringify({ primaryEndpoint: expected }));
     promoted = await createServer({
       configFile: false, root, base: '/', plugins: [react()],
       resolve: { alias: { '@': path.join(root, 'src'), './connection.json': fixture } },
@@ -182,13 +187,15 @@ test('promotion uses one validated setting for both HTML languages and all agent
     const renderer = await promoted.ssrLoadModule('/src/entry-server.tsx');
     for (const route of ['/', '/en/', '/lv/mcp', '/en/mcp']) {
       const html = renderer.renderPage(template, route);
-      assert.ok(html.includes('data-testid="text-public-endpoint">https://abcde.lv/mcp</code>'));
-      assert.equal(html.includes('https://abcde-mcp.replit.app/mcp'), false);
+      assert.ok(html.includes(`data-testid="text-public-endpoint">${expected}</code>`));
+      assert.equal(html.includes(other), false);
     }
     for (const [name, document] of Object.entries(renderer.agentDocuments())) {
       if (name.endsWith('.md') || name.endsWith('llms.txt')) {
-        assert.ok(document.body.includes('https://abcde.lv/mcp'), name);
-        assert.equal(document.body.includes('https://abcde-mcp.replit.app/mcp'), false);
+        assert.ok(document.body.includes(expected), name);
+        // The main-domain endpoint is also a prefix of legitimate /mcp-site/ URLs.
+        assert.equal(document.body.includes(`(${other})`), false, name);
+        assert.equal(document.body.split('\n').some((line) => line.endsWith(` ${other}`)), false, name);
       }
     }
   } finally {
@@ -196,6 +203,7 @@ test('promotion uses one validated setting for both HTML languages and all agent
     await rm(directory, { recursive: true, force: true });
   }
 });
+}
 
 test('endpoint configuration rejects private/dev addresses, credentials and query parameters', () => {
   for (const value of ['http://example.com/mcp', 'https://localhost/mcp', 'https://test.replit.dev/mcp',
@@ -283,7 +291,7 @@ test('real HTTP proxy preserves production pages, scoped files and unrelated hos
       assert.equal(response.status, 200);
       const html = await response.text();
       assert.ok(html.includes(`lang="${lang}"`));
-      assert.ok(html.includes('https://abcde-mcp.replit.app/mcp'));
+      assert.ok(html.includes(config.verifiedMcpEndpoint));
       const assets = [...html.matchAll(/(?:src|href)="(\/mcp-site\/[^"]+)"/g)].map((m) => m[1]);
       for (const asset of assets) assert.equal((await fetch(`${origin}${asset}`)).status, 200, asset);
       const alias = await fetch(`${origin}/${lang}/mcp/`, { redirect: 'manual' });

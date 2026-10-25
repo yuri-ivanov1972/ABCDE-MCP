@@ -1,5 +1,45 @@
 # Verification record
 
+## Main-domain address promoted — 25 October 2026
+
+**Implemented and verified locally; the final instructions update awaits owner publication.**
+
+- The owner explicitly confirmed that Claude returned actual product details
+  using https://abcde.lv/mcp and approved proceeding. This is owner-observed
+  acceptance; the agent did not access the owner's Claude account.
+- The shared landing-page setting now selects https://abcde.lv/mcp. Both
+  language pages, initial HTML, browser clipboard and generated Markdown/llms.txt
+  consume that setting. The original direct endpoint remains supported with no
+  backend host-policy, route, tool, database or authentication changes.
+- Landing TypeScript checking and production build passed. The existing nonfatal
+  tooltip sourcemap warning remains.
+- All 22 landing-page/document regression tests passed, including isolated
+  renders using each approved endpoint, rejection of invalid selections and
+  obsolete environment overrides, and the built human-page proxy contract.
+- Chromium checked the built production bundle through the human-page proxy:
+  no-JavaScript content in both languages, hydration/navigation/reload, actual
+  aggregate counters, actual clipboard contents, copy announcements and mobile
+  overflow. The endpoint copied exactly https://abcde.lv/mcp; no fresh
+  JavaScript/hydration errors were observed.
+- The public-check helper now connects directly to public targets instead of
+  inserting another local proxy. With no arguments it retains the development
+  direct-versus-reference-proxy comparison; --direct-only also works for local
+  targets.
+- The updated helper passed against both https://abcde.lv/mcp and
+  https://abcde-mcp.replit.app/mcp: legacy and automatic modern negotiation,
+  exactly three read-only tools, successful live calls to all three, complete
+  JSON-text/structured parity, unknown-Origin rejection, notifications 202 and
+  stateless GET/DELETE 405 without HTML fallback.
+- The unchanged local proxy comparison also passed using the updated helper.
+  These explicit live checks incremented real aggregate counters; none were reset.
+- The managed landing workflow was restarted after the changes.
+
+No publication or separate-project edits were performed by the agent. After the
+owner republishes this project, verify fresh instructions on both abcde.lv
+language pages, the copied endpoint and scoped text documents. Public machine
+endpoint success does not establish that the newly built human instructions
+are already live. The earlier sections below describe historical stages.
+
 ## Main-domain Claude endpoint preparation — 25 October 2026
 
 **Local readiness verified; no public cutover or publication performed.**

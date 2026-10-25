@@ -30,17 +30,18 @@ Catalogue requests currently need no API key. Do not add `ABCDE_API_KEY`, `RIMI_
 
 The MCP host policy explicitly retains both `abcde.lv` and
 `abcde-mcp.replit.app`, independently of the advertised address. It never trusts
-request-provided forwarded hosts. The landing page currently advertises the
-working direct endpoint; after the main-domain machine route is verified,
-promote `artifacts/abcde-mcp/src/connection.json` to `https://abcde.lv/mcp` and
-rebuild. Only the two owner-approved endpoint strings are accepted; obsolete
+request-provided forwarded hosts. The landing page now selects
+`https://abcde.lv/mcp` through `artifacts/abcde-mcp/src/connection.json`;
+the original direct endpoint remains supported. Rebuild and republish to update
+public instructions. Only the two owner-approved endpoint strings are accepted; obsolete
 environment overrides cannot change clipboard or AI-readable instructions.
 
 See [the Claude endpoint migration handoff](CLAUDE-ENDPOINT-HANDOFF.md) and its
 [dedicated streaming MCP proxy](abcde-mcp-proxy.mjs). That machine proxy is
 separate from the human-page proxy and must run before body parsers. The new
-main-domain endpoint is not claimed live until the other project publishes and
-actual public MCP/Claude checks pass. Neither connector address is retired.
+main-domain endpoint passed direct official-client checks, and the owner confirmed
+actual product details in Claude on 25 October 2026. Neither address is retired.
+The advertised-address change here still requires owner publication.
 
 ## Architecture and routes
 
@@ -193,7 +194,7 @@ The bilingual copy lives in `artifacts/abcde-mcp/src/page-content.tsx`. Edit it 
 
 The normal build first bundles browser assets, then prerenders the same React page into Latvian and English HTML and generates the documents. Development uses the same renderer. CSS is linked directly in the HTML, so a JavaScript-disabled browser still gets the design. React hydrates the existing content; counters fetch only after mounting. Initial HTML reports counters as unavailable, and text documents never publish frozen counts.
 
-The human-page canonical origin is the owner-selected `https://abcde.lv`, with `/lv/mcp` and `/en/mcp` as the canonical language paths. The connector remains exactly `https://abcde-mcp.replit.app/mcp` with no environment override. These addresses are deliberately independent. The standalone upstream origin was freshly confirmed through deployment metadata on 25 October 2026; this does not mean the new paths have been published or the separate abcde.lv project has been changed.
+The human-page canonical origin is `https://abcde.lv`, with `/lv/mcp` and `/en/mcp` as the canonical language paths. The selected connector is `https://abcde.lv/mcp`, with no environment override. The separate main-site project proxies that machine route to the still-supported `https://abcde-mcp.replit.app/mcp`. Human and machine routing remain distinct; changing the advertised setting does not modify either server's routing.
 
 See [the abcde.lv integration handoff](ABCDE-LV-HANDOFF.md) and its framework-neutral [Node proxy reference](abcde-page-proxy.mjs). Forward only the exact language routes and allowlisted `/mcp-site/` resources, not the host's broad assets/API/language namespaces. Preserve the main site's existing root discovery files. The relay uses the existing API service on internal port 8080, strips browser credentials, times out, and reports statistics failures as unavailable rather than making up counters.
 
@@ -221,3 +222,18 @@ pnpm --filter @workspace/api-server run test:protocol -- https://YOUR-ACTUAL-PUB
 ```
 
 The protocol-check script uses the official MCP client package, validates both legacy initialization and modern version negotiation, calls all three tools against real data, checks partial/error cases, and verifies aggregate counter changes. Never put the placeholder URL above on the landing page.
+
+For a bounded public connection smoke check without an extra local proxy:
+
+```sh
+cd artifacts/api-server
+node proxy-protocol-check.mjs https://abcde.lv/mcp
+node proxy-protocol-check.mjs https://abcde-mcp.replit.app/mcp
+```
+
+Public targets are checked directly using the official SDK, both negotiation
+modes and all three live tools, including complete text/structured result parity.
+With no target argument the helper still compares the development gateway and a
+local proxy reference. Use `--direct-only` to skip that comparison for a local
+target too. These explicit live checks increment real aggregate tool counters;
+they are separate from the offline unit suites.
