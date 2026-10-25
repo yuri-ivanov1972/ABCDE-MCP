@@ -21,6 +21,12 @@ Use `https://abcde-mcp.replit.app/mcp` as the authoritative connection address i
 
 **How to apply:** Keep displayed instructions, clipboard output and generated documents aligned. Do not restore an environment override without a new owner request.
 
+The owner selected `https://abcde.lv/lv/mcp` and `https://abcde.lv/en/mcp` for the human pages. The owner controls abcde.lv in a separate Replit project.
+
+**Why:** Language-prefixed paths fit the owner's main website; this does not move the Claude endpoint.
+
+**How to apply:** Treat the human origin and MCP service origin independently. Support here is not proof of routing or publication in the other project. Preserve that site's existing routes and root discovery files.
+
 Do not describe this connector as requiring Claude Pro or Max: the owner states Claude Free supports one MCP connector.
 
 **Why:** The owner corrected the paid-plan-only setup wording.

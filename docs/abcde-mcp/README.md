@@ -32,6 +32,8 @@ Catalogue requests currently need no API key. Do not add `ABCDE_API_KEY`, `RIMI_
 
 - `/` — Latvian landing page, with complete HTML before JavaScript.
 - `/en/` — English landing page; `/en` redirects here. The language switch uses normal links and works without JavaScript. Explicit language URLs take precedence over the browser's stored preference; the current selection is still recorded locally.
+- `/lv/mcp`, `/en/mcp` — integration-ready language pages for `https://abcde.lv/lv/mcp` and `https://abcde.lv/en/mcp`. Their language links stay on those paths; trailing-slash aliases redirect to the no-slash address.
+- `/mcp-site/` — scoped assets, favicon, copies of the agent documents and an uncached `/mcp-site/stats` relay to the existing local API. Only these scoped resources and the two language pages need forwarding by the other website.
 - `/content/lv.md`, `/content/en.md` — complete shared landing-page copy as UTF-8 Markdown.
 - `/llms.txt` — voluntary AI-agent discovery index, linking to both human pages, both Markdown documents and the configured public MCP endpoint. Not a guarantee of indexing or support by every AI provider.
 - `/robots.txt`, `/sitemap.xml` — permissive crawl policy and the two canonical language pages.
@@ -170,7 +172,9 @@ The bilingual copy lives in `artifacts/abcde-mcp/src/page-content.tsx`. Edit it 
 
 The normal build first bundles browser assets, then prerenders the same React page into Latvian and English HTML and generates the documents. Development uses the same renderer. CSS is linked directly in the HTML, so a JavaScript-disabled browser still gets the design. React hydrates the existing content; counters fetch only after mounting. Initial HTML reports counters as unavailable, and text documents never publish frozen counts.
 
-The published origin in `src/site-config.ts` was verified through deployment metadata as `https://abcde-mcp.replit.app` on 24 October 2026. Its `/mcp` route was confirmed present. Re-check deployment metadata before changing that public origin or moving domains; never substitute a development URL. The public endpoint has a shared validated override, so human and agent documents show the same connection address.
+The human-page canonical origin is the owner-selected `https://abcde.lv`, with `/lv/mcp` and `/en/mcp` as the canonical language paths. The connector remains exactly `https://abcde-mcp.replit.app/mcp` with no environment override. These addresses are deliberately independent. The standalone upstream origin was freshly confirmed through deployment metadata on 25 October 2026; this does not mean the new paths have been published or the separate abcde.lv project has been changed.
+
+See [the abcde.lv integration handoff](ABCDE-LV-HANDOFF.md) and its framework-neutral [Node proxy reference](abcde-page-proxy.mjs). Forward only the exact language routes and allowlisted `/mcp-site/` resources, not the host's broad assets/API/language namespaces. Preserve the main site's existing root discovery files. The relay uses the existing API service on internal port 8080, strips browser credentials, times out, and reports statistics failures as unavailable rather than making up counters.
 
 Production uses a small Node file server for the **generated files**, not runtime server rendering or the Vite development server. This replaces the former catch-all static SPA rewrite so Markdown/XML/text receive explicit MIME types and missing documents return actual 404s. It binds to the managed `PORT`; existing API/MCP routing remains separate. Hashed assets are immutable-cacheable; content documents revalidate. The artifact configuration change has been schema-validated but has not been published by the agent.
 
@@ -181,9 +185,10 @@ PORT=23462 BASE_PATH=/ pnpm --filter @workspace/abcde-mcp run build
 pnpm --filter @workspace/abcde-mcp run typecheck
 pnpm --filter @workspace/abcde-mcp run test
 node artifacts/abcde-mcp/scripts/browser-check.mjs http://127.0.0.1:80
+node artifacts/abcde-mcp/scripts/browser-check.mjs --production-integration
 ```
 
-Run the browser check only against a running development proxy. It uses the workspace Chromium, checks both languages with JavaScript disabled, then verifies hydration, language navigation/reload, live counters, real clipboard contents, announcements and phone-width overflow. The Node regression suite checks shared copy, metadata/discovery, endpoint validation, built-file responses, MIME types, redirects, asset links and missing-file behavior without changing MCP counters or querying the catalogue.
+The first browser command targets the running development proxy. `--production-integration` starts temporary local production-file and host-proxy servers and checks the built bundles at the new language paths; the real API workflow must be running for counters. Both use workspace Chromium and check both languages with JavaScript disabled, then hydration, language navigation/reload, live counters, real clipboard contents, announcements and phone-width overflow. The Node regression suite additionally exercises the production proxy contract, route isolation, scoped statistics, credential stripping and explicit failures using fixtures only inside its test boundary. These checks do not make MCP tool calls or query the catalogue.
 
 After the owner republishes, verify the actual public routes and headers again. A development fetch cannot establish that an outside agent can reach the newly published release. No AI indexing or citations are promised.
 

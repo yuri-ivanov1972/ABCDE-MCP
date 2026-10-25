@@ -3,12 +3,12 @@ import { renderToString } from 'react-dom/server';
 import App from './App';
 import { ErrorBoundary } from './components/error-boundary';
 import { copyPrompts, translations, type Language } from './page-content';
-import { publishedOrigin, sitePath, verifiedMcpEndpoint } from './site-config';
+import { contentNamespace, languagePaths, publicPageUrl, publishedOrigin, sitePath, verifiedMcpEndpoint } from './site-config';
 
 const base = import.meta.env.BASE_URL;
 const endpoint = verifiedMcpEndpoint;
 const languages: Language[] = ['lv', 'en'];
-export const pageRoutes = ['', 'en/'];
+export const pageRoutes = ['', 'en/', ...Object.values(languagePaths)];
 
 function text(node: ReactNode): string {
   return Children.toArray(node).map((child): string => {
@@ -23,14 +23,15 @@ function escape(value: string): string {
 }
 
 export function pageLanguage(path: string): Language {
-  return path.replace(/\/$/, '') === sitePath(base, 'en').replace(/\/$/, '') ? 'en' : 'lv';
+  const normalized = path.replace(/\/$/, '');
+  return [sitePath(base, 'en'), sitePath(base, languagePaths.en)].includes(normalized) ? 'en' : 'lv';
 }
 
 export function renderPage(template: string, path: string): string {
   const language = pageLanguage(path);
   const content = translations[language];
   const title = language === 'lv' ? 'ABCDE MCP — pārtikas dati un iepirkumu saraksti' : 'ABCDE MCP — food data and smarter shopping lists';
-  const canonical = new URL(sitePath(base, language === 'en' ? 'en/' : ''), publishedOrigin).href;
+  const canonical = publicPageUrl(language);
   const head = [
     `<title>${escape(title)}</title>`,
     `<meta name="description" content="${escape(content.intro)}">`,
@@ -42,14 +43,14 @@ export function renderPage(template: string, path: string): string {
     '<meta name="twitter:card" content="summary">',
     `<meta name="twitter:title" content="${escape(title)}">`,
     `<meta name="twitter:description" content="${escape(content.intro)}">`,
-    `<link rel="alternate" type="text/markdown" hreflang="${language}" href="${sitePath(base, `content/${language}.md`)}" title="ABCDE MCP — Markdown">`,
-    `<link rel="alternate" type="text/plain" href="${sitePath(base, 'llms.txt')}" title="AI agent content index">`,
+    `<link rel="alternate" type="text/markdown" hreflang="${language}" href="${sitePath(base, `${contentNamespace}content/${language}.md`)}" title="ABCDE MCP — Markdown">`,
+    `<link rel="alternate" type="text/plain" href="${sitePath(base, `${contentNamespace}llms.txt`)}" title="AI agent content index">`,
     ...(publishedOrigin ? [
       `<link rel="canonical" href="${canonical}">`,
       `<meta property="og:url" content="${canonical}">`,
-      ...languages.map((lang) => `<link rel="alternate" hreflang="${lang}" href="${new URL(sitePath(base, lang === 'en' ? 'en/' : ''), publishedOrigin).href}">`),
-      `<link rel="alternate" hreflang="x-default" href="${new URL(sitePath(base), publishedOrigin).href}">`,
-      `<link rel="sitemap" type="application/xml" href="${sitePath(base, 'sitemap.xml')}">`,
+      ...languages.map((lang) => `<link rel="alternate" hreflang="${lang}" href="${publicPageUrl(lang)}">`),
+      `<link rel="alternate" hreflang="x-default" href="${publicPageUrl('lv')}">`,
+      `<link rel="sitemap" type="application/xml" href="${sitePath(base, `${contentNamespace}sitemap.xml`)}">`,
     ] : []),
   ].join('\n    ');
   const markup = renderToString(<ErrorBoundary><App ssrPath={path} /></ErrorBoundary>);
@@ -61,7 +62,7 @@ export function markdown(language: Language): string {
   const c = translations[language];
   return [
     '# ABCDE MCP', '', text(c.heading), '', c.eyebrow, '', c.intro, '',
-    `[${c.heroLink}](${sitePath(base, language === 'en' ? 'en/#connect' : '#connect')})`,
+    `[${c.heroLink}](${publicPageUrl(language)}#connect)`,
     '', c.visualCaption, '', `## ${c.stepsTitle}`, '', c.stepsIntro, '',
     ...c.steps.flatMap(([title, description], index) => [`${index + 1}. **${title}** — ${description}`, '']),
     `## ${c.setupTitle}`, '', c.setupIntro, '', `${c.endpointLabel}: ${endpoint || c.endpointMissing}`, '',
@@ -73,13 +74,13 @@ export function markdown(language: Language): string {
     c.statsStaticNote,
     '', `${c.sessions}: ${c.sessionless}`, '', c.sessionsCaption, '', c.privacy, '',
     `${c.footer} · [abcde.lv](https://abcde.lv)`, '', c.footerTag, '',
-    `[LV](${sitePath(base)}) · [EN](${sitePath(base, 'en/')}) · [llms.txt](${sitePath(base, 'llms.txt')})`, '',
+    `[LV](${publicPageUrl('lv')}) · [EN](${publicPageUrl('en')}) · [llms.txt](${publishedOrigin}/${contentNamespace}llms.txt)`, '',
   ].join('\n');
 }
 
 export function agentDocuments(): Record<string, { type: string; body: string }> {
-  const url = (path: string) => publishedOrigin ? new URL(sitePath(base, path), publishedOrigin).href : sitePath(base, path);
-  return {
+  const url = (path: string) => new URL(`${contentNamespace}${path}`, `${publishedOrigin}/`).href;
+  const documents: Record<string, { type: string; body: string }> = {
     'content/lv.md': { type: 'text/markdown; charset=utf-8', body: markdown('lv') },
     'content/en.md': { type: 'text/markdown; charset=utf-8', body: markdown('en') },
     'llms.txt': {
@@ -89,8 +90,8 @@ export function agentDocuments(): Record<string, { type: string; body: string }>
         'Independent, public, read-only project by ABCDE Open Food Data Lab. Purchases happen on retailer websites.',
         'This index follows the voluntary llms.txt discovery convention; support by any particular AI service is not guaranteed.', '',
         '## Website content', '',
-        `- [Latvian page](${url('')})`,
-        `- [English page](${url('en/')})`,
+        `- [Latvian page](${publicPageUrl('lv')})`,
+        `- [English page](${publicPageUrl('en')})`,
         `- [Latvian content — Markdown](${url('content/lv.md')})`,
         `- [English content — Markdown](${url('content/en.md')})`,
         ...(endpoint ? ['', '## MCP connection', '', `- [Public MCP endpoint](${endpoint}): Streamable HTTP, not an HTML content page. No sign-in required.`] : []),
@@ -102,7 +103,10 @@ export function agentDocuments(): Record<string, { type: string; body: string }>
     'robots.txt': { type: 'text/plain; charset=utf-8', body: `User-agent: *\nAllow: /\n${publishedOrigin ? `Sitemap: ${url('sitemap.xml')}\n` : ''}` },
     ...(publishedOrigin ? { 'sitemap.xml': {
       type: 'application/xml; charset=utf-8',
-      body: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pageRoutes.map((path) => `  <url><loc>${escape(url(path))}</loc></url>`).join('\n')}\n</urlset>\n`,
+      body: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${languages.map((lang) => `  <url><loc>${escape(publicPageUrl(lang))}</loc></url>`).join('\n')}\n</urlset>\n`,
     } } : {}),
   };
+  // Legacy documents remain available on the standalone service. Only scoped paths
+  // are forwarded by abcde.lv; its root discovery files belong to the main site.
+  return { ...documents, ...Object.fromEntries(Object.entries(documents).map(([name, doc]) => [`${contentNamespace}${name}`, doc])) };
 }

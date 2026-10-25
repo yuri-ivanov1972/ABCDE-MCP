@@ -2,6 +2,8 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pageRoute } from './page-routes.mjs';
+import { internalStatsUrl, serveStats } from './stats-response.mjs';
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist/public');
 const types = {
@@ -14,7 +16,7 @@ const types = {
 
 // Serve generated files, not runtime SSR. Explicit MIME types and real missing-file
 // responses prevent agents from receiving SPA HTML at a Markdown/document URL.
-export function createProductionServer({ root = defaultRoot, basePath = '/' } = {}) {
+export function createProductionServer({ root = defaultRoot, basePath = '/', statsUrl = internalStatsUrl } = {}) {
   const directory = path.resolve(root);
   const base = `/${basePath.replace(/^\/|\/$/g, '')}`.replace(/\/?$/, '/');
   return createServer(async (req, res) => {
@@ -31,11 +33,14 @@ export function createProductionServer({ root = defaultRoot, basePath = '/' } = 
     catch { return send(400, 'Invalid URL\n'); }
     if (!pathname.startsWith(base) || pathname.includes('\0') || pathname.includes('\\')) return send(404, 'Not found\n');
     let relative = pathname.slice(base.length);
-    if (['en', 'index.html', 'en/index.html'].includes(relative)) {
-      res.writeHead(308, { Location: `${base}${relative.startsWith('en') ? 'en/' : ''}` });
+    if (relative === 'mcp-site/stats') return serveStats(req, res, statsUrl);
+    const route = pageRoute(relative);
+    if (route.redirect !== undefined) {
+      const query = (req.url ?? '').includes('?') ? `?${req.url.split('?').slice(1).join('?')}` : '';
+      res.writeHead(308, { Location: `${base}${route.redirect}${query}` });
       return res.end();
     }
-    if (relative === '' || relative.endsWith('/')) relative += 'index.html';
+    relative = route.file ?? relative;
     const filename = path.resolve(directory, relative);
     if (!filename.startsWith(`${directory}${path.sep}`)) return send(404, 'Not found\n');
     try {
@@ -47,7 +52,7 @@ export function createProductionServer({ root = defaultRoot, basePath = '/' } = 
         'Content-Type': `${type}${/^(text\/|application\/(?:xml|json))/.test(type) ? '; charset=utf-8' : ''}`,
         'Content-Length': data.length,
         'X-Content-Type-Options': 'nosniff',
-        'Cache-Control': relative.startsWith('assets/') ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate',
+        'Cache-Control': /^(?:mcp-site\/)?assets\//.test(relative) ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate',
       });
       res.end(req.method === 'HEAD' ? undefined : data);
     } catch (error) {

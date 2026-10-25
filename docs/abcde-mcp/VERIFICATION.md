@@ -118,3 +118,20 @@ For a published release, pass its actual `/mcp` URL to `test:protocol`, then per
 - No publication was performed. The current public release is not claimed to contain these changes.
 - After owner publication, obtain fresh deployment metadata and check public routing, actual headers, canonical/language links, no-JavaScript page bodies, Markdown/index content, and missing-document 404s. This is particularly important because the web artifact now serves generated files through its own production process rather than the former static SPA catch-all.
 - AI providers may choose not to crawl or index these pages. `llms.txt` is a discovery aid, not a universally supported protocol or a promise of citations.
+
+## Main-website language routes — 2026-10-25
+
+### Passed locally
+
+- Fresh deployment metadata confirmed `https://abcde-mcp.replit.app` as this project's public successful upstream release. The human-page targets are owner-selected `https://abcde.lv/lv/mcp` and `https://abcde.lv/en/mcp`; the Claude connector address remains exactly `https://abcde-mcp.replit.app/mcp`.
+- Landing typecheck and production build passed. All **18 regression tests passed**, covering the four human routes, shared initial HTML/Markdown, public metadata, scoped generated assets/documents, real 404s, HEAD/MIME behavior and slash normalization.
+- Actual Node HTTP integration tests forwarded built pages through the framework-neutral proxy reference. Unrelated host routes remained untouched; test-only statistics fixtures verified credential stripping, correct counters, no caching and explicit 503 behavior. An unavailable upstream returned a bounded 502.
+- Chromium ran against the **built production bundle through the local host proxy**, not just Vite: both new language paths worked with JavaScript disabled; hydration, language switching/reload, actual local API counters, endpoint/prompt clipboard actions, announcements and phone-width overflow checks passed without fresh JavaScript/hydration errors.
+- Development HTTP returned 200 for both new routes and scoped statistics. Desktop Latvian and 390 px English screenshots showed the existing design intact. The managed web workflow restarted cleanly.
+- No MCP/backend/API/schema/dietary-rule changes were made. Statistics forwarding is a landing-server route to the existing local API, not a new data source. No tool calls or catalogue lookups were made for this work.
+
+### Remaining launch steps
+
+- No publishing occurred. This workspace does not contain the separate abcde.lv website and has not changed its routing, CSP, discovery files or deployment.
+- `ABCDE-LV-HANDOFF.md` specifies narrow forwarding, staged publication, framework inspection and public checks. Its adjacent `abcde-page-proxy.mjs` is a tested Node reference, not a claim that abcde.lv uses Node request/response middleware.
+- Publish this MCP project first, check the upstream paths, then apply and verify the handoff in the main website project before publishing that project. Public URLs and main-site CSP/service-worker compatibility remain unverified until those steps are performed.

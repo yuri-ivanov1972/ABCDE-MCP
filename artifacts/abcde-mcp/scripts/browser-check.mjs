@@ -4,8 +4,29 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { createProductionServer } from './serve.mjs';
+import { createMcpPageProxy } from '../../../docs/abcde-mcp/abcde-page-proxy.mjs';
 
-const origin = process.argv[2] ?? 'http://127.0.0.1:80';
+let origin = process.argv.find((arg, index) => index > 1 && !arg.startsWith('--')) ?? 'http://127.0.0.1:80';
+const integrated = process.argv.includes('--integrated') || process.argv.includes('--production-integration');
+const lvRoute = integrated ? '/lv/mcp' : '/';
+const enRoute = integrated ? '/en/mcp' : '/en/';
+const servers = [];
+if (process.argv.includes('--production-integration')) {
+  const upstream = createProductionServer();
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  servers.push(upstream);
+  const proxy = createMcpPageProxy({ upstreamOrigin: `http://127.0.0.1:${upstream.address().port}` });
+  const host = createServer(async (req, res) => {
+    if (await proxy(req, res)) return;
+    res.writeHead(404); res.end('Not found');
+  });
+  await new Promise((resolve) => host.listen(0, '127.0.0.1', resolve));
+  servers.push(host);
+  origin = `http://127.0.0.1:${host.address().port}`;
+  console.log('Checking built production files through the abcde.lv proxy contract; using the real local API counters');
+}
 const directory = await mkdtemp(path.join(os.tmpdir(), 'abcde-agent-browser-'));
 const browser = spawn('chromium', [
   '--headless', '--no-sandbox', '--disable-dev-shm-usage', '--no-first-run',
@@ -68,21 +89,21 @@ try {
   await send('Page.enable', {}, session);
   await send('Runtime.enable', {}, session);
   await send('Emulation.setScriptExecutionDisabled', { value: true }, session);
-  for (const [route, language, heading] of [['/', 'lv', 'Veido veselīgāku'], ['/en/', 'en', 'Build a healthier']]) {
+  for (const [route, language, heading] of [[lvRoute, 'lv', 'Veido veselīgāku'], [enRoute, 'en', 'Build a healthier']]) {
     await navigate(route, language);
     assert.ok((await evaluate("document.querySelector('h1').innerText")).includes(heading));
     assert.equal(await evaluate("document.querySelectorAll('[data-testid^=\"text-setup-step-\"]').length"), 4);
     assert.equal(await evaluate("document.querySelectorAll('[data-testid^=\"text-limitation-\"]').length"), 6);
-    assert.ok(await evaluate("!!document.querySelector('a[href=\"/content/" + language + ".md\"]')"));
+    assert.ok(await evaluate("!!document.querySelector('a[href=\"/mcp-site/content/" + language + ".md\"]')"));
     await waitFor("getComputedStyle(document.body).margin === '0px'");
   }
   console.log('PASS JavaScript disabled: both full language pages, instructions, limitations, CSS and Markdown links');
 
   await send('Emulation.setScriptExecutionDisabled', { value: false }, session);
-  await navigate('/', 'lv');
+  await navigate(lvRoute, 'lv');
   await waitFor('/^\\d/.test(document.querySelector("[data-testid=value-tool-calls]")?.textContent?.trim() ?? "")');
   await evaluate("localStorage.setItem('abcde-mcp-language', 'lv'); document.querySelector('[data-testid=button-language-en]').click()");
-  await waitFor('location.pathname === "/en/" && document.documentElement.lang === "en"');
+  await waitFor(`location.pathname === ${JSON.stringify(enRoute)} && document.documentElement.lang === "en"`);
   await waitFor('/^\\d/.test(document.querySelector("[data-testid=value-tool-calls]")?.textContent?.trim() ?? "")');
   assert.equal(await evaluate("localStorage.getItem('abcde-mcp-language')"), 'en');
   await evaluate('window.__agentCheckBeforeReload = true');
@@ -95,6 +116,7 @@ try {
   });
   await send('Page.bringToFront', {}, session);
   const endpoint = await evaluate("document.querySelector('[data-testid=text-public-endpoint]').textContent");
+  assert.equal(endpoint, 'https://abcde-mcp.replit.app/mcp');
   await evaluate("document.querySelector('[data-testid=button-copy-endpoint]').click()");
   await waitFor('document.querySelector("[data-testid=status-copy-announcement]").textContent === "Copied"');
   assert.equal(await evaluate('navigator.clipboard.readText()'), endpoint);
@@ -107,11 +129,12 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true }, session);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'));
   await evaluate("document.querySelector('[data-testid=button-language-lv]').click()");
-  await waitFor('location.pathname === "/" && document.documentElement.lang === "lv"');
+  await waitFor(`location.pathname === ${JSON.stringify(lvRoute)} && document.documentElement.lang === "lv"`);
   assert.equal(errors.length, 0, errors.join('\n'));
   console.log('PASS mobile overflow/language navigation and no fresh JavaScript or hydration errors');
 } finally {
   try { await send('Browser.close'); } catch { browser.kill(); }
   await new Promise((resolve) => browser.exitCode !== null ? resolve() : browser.once('exit', resolve));
   await rm(directory, { recursive: true, force: true });
+  for (const server of servers.reverse()) await new Promise((resolve) => server.close(resolve));
 }

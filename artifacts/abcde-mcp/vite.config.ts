@@ -65,6 +65,7 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname),
   build: {
+    assetsDir: 'mcp-site/assets',
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
   },

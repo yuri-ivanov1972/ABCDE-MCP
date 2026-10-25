@@ -7,6 +7,8 @@ import { createServer } from 'vite';
 import react from '@vitejs/plugin-react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createProductionServer } from './serve.mjs';
+import { createServer as createHttpServer } from 'node:http';
+import { createMcpPageProxy } from '../../../docs/abcde-mcp/abcde-page-proxy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let vite, renderer, content, config, template, production, address;
@@ -37,8 +39,8 @@ function plain(html) {
     .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'");
 }
 
-for (const [language, route] of [['lv', '/'], ['en', '/en/']]) {
-  test(`${language}: initial HTML contains full shared page content without JavaScript`, () => {
+for (const [language, route] of [['lv', '/'], ['en', '/en/'], ['lv', '/lv/mcp'], ['en', '/en/mcp']]) {
+  test(`${route}: initial HTML contains full shared page content without JavaScript`, () => {
     const html = renderer.renderPage(template, route);
     const visible = plain(html);
     const md = renderer.markdown(language);
@@ -62,15 +64,20 @@ for (const [language, route] of [['lv', '/'], ['en', '/en/']]) {
     assert.ok(!/<div[^>]*data-testid="value-tool-calls"[^>]*>\d/.test(html));
   });
 
-  test(`${language}: canonical, alternatives and content discovery use verified public URLs`, () => {
+  test(`${route}: canonical, alternatives and content discovery use selected public URLs`, () => {
     const html = renderer.renderPage(template, route);
-    assert.ok(html.includes(`rel="canonical" href="${config.publishedOrigin}${route}"`));
+    assert.ok(html.includes(`rel="canonical" href="https://abcde.lv/${language}/mcp"`));
+    assert.ok(html.includes(`property="og:url" content="https://abcde.lv/${language}/mcp"`));
     assert.match(html, /hreflang="lv"/);
     assert.match(html, /hreflang="en"/);
     assert.match(html, /hreflang="x-default"/);
-    assert.ok(html.includes(`href="/content/${language}.md"`));
-    assert.ok(html.includes('href="/llms.txt"'));
+    assert.ok(html.includes(`href="/mcp-site/content/${language}.md"`));
+    assert.ok(html.includes('href="/mcp-site/llms.txt"'));
     assert.ok(html.includes(`href="${route}" hrefLang="${language}"`));
+    if (route.endsWith('/mcp')) {
+      assert.ok(html.includes('href="/lv/mcp" hrefLang="lv"'));
+      assert.ok(html.includes('href="/en/mcp" hrefLang="en"'));
+    }
     assert.equal(html.includes('.replit.dev'), false);
   });
 }
@@ -94,13 +101,18 @@ test('agent documents contain shared content, not snapshots or unsupported promi
   assert.match(documents['robots.txt'].body, /User-agent: \*\nAllow: \//);
   assert.equal((documents['sitemap.xml'].body.match(/<loc>/g) ?? []).length, 2);
   assert.equal(documents['sitemap.xml'].body.includes('/api/'), false);
-  assert.equal(documents['sitemap.xml'].body.includes('/mcp'), false);
+  assert.ok(documents['sitemap.xml'].body.includes('https://abcde.lv/lv/mcp</loc>'));
+  assert.ok(documents['sitemap.xml'].body.includes('https://abcde.lv/en/mcp</loc>'));
+  assert.equal(documents['sitemap.xml'].body.includes('replit.app'), false);
+  for (const name of ['content/lv.md', 'content/en.md', 'llms.txt', 'sitemap.xml']) {
+    assert.equal(documents[`mcp-site/${name}`].body, documents[name].body);
+  }
 });
 
 test('the real connection address wins over obsolete configuration everywhere', async () => {
   const expected = 'https://abcde-mcp.replit.app/mcp';
   assert.equal(config.verifiedMcpEndpoint, expected);
-  for (const route of ['/', '/en/']) {
+  for (const route of ['/', '/en/', '/lv/mcp', '/en/mcp']) {
     const html = renderer.renderPage(template, route);
     assert.ok(html.includes(`data-testid="text-public-endpoint">${expected}</code>`));
     assert.ok(html.includes('data-testid="button-copy-endpoint"'));
@@ -129,16 +141,23 @@ test('production files return the right body, MIME type, UTF-8 and no HTML fallb
   for (const [route, type, sample] of [
     ['/', 'text/html', 'Veido veselīgāku'],
     ['/en/', 'text/html', 'Build a healthier'],
+    ['/lv/mcp', 'text/html', 'Veido veselīgāku'],
+    ['/en/mcp', 'text/html', 'Build a healthier'],
     ['/content/lv.md', 'text/markdown', 'Iesaki'],
     ['/content/en.md', 'text/markdown', 'Suggest a high-protein'],
     ['/llms.txt', 'text/plain', '# ABCDE MCP'],
     ['/robots.txt', 'text/plain', 'User-agent: *'],
     ['/sitemap.xml', 'application/xml', '<urlset'],
+    ['/mcp-site/content/lv.md', 'text/markdown', 'Iesaki'],
+    ['/mcp-site/content/en.md', 'text/markdown', 'Suggest a high-protein'],
+    ['/mcp-site/llms.txt', 'text/plain', '# ABCDE MCP'],
+    ['/mcp-site/sitemap.xml', 'application/xml', '<urlset'],
+    ['/mcp-site/favicon.svg', 'image/svg+xml', '<svg'],
   ]) {
     const response = await fetch(`${address}${route}`);
     assert.equal(response.status, 200, route);
     assert.ok(response.headers.get('content-type').startsWith(type), route);
-    assert.match(response.headers.get('content-type'), /charset=utf-8/);
+    if (!type.startsWith('image/')) assert.match(response.headers.get('content-type'), /charset=utf-8/);
     const body = await response.text();
     assert.ok(body.includes(sample), route);
     if (route.endsWith('.md') || route.endsWith('.txt')) assert.equal(body.includes('<!DOCTYPE'), false);
@@ -150,7 +169,7 @@ test('production files return the right body, MIME type, UTF-8 and no HTML fallb
 
 test('missing documents and unknown routes return real 404 responses', async () => {
   for (const route of ['/content/missing.md', '/missing.txt', '/missing.xml', '/missing-page', '/assets/missing.js',
-    '/%2e%2e%2fpackage.json']) {
+    '/mcp-site/content/missing.md', '/mcp-site/assets/missing.js', '/%2e%2e%2fpackage.json']) {
     const response = await fetch(`${address}${route}`);
     assert.equal(response.status, 404, route);
     assert.match(response.headers.get('content-type'), /^text\/plain/);
@@ -164,9 +183,14 @@ test('language aliases redirect and generated asset links resolve', async () => 
   const response = await fetch(`${address}/en`, { redirect: 'manual' });
   assert.equal(response.status, 308);
   assert.equal(response.headers.get('location'), '/en/');
-  for (const route of ['/', '/en/']) {
+  for (const alias of ['/lv/mcp/', '/en/mcp/', '/lv/mcp/index.html', '/en/mcp/index.html']) {
+    const response = await fetch(`${address}${alias}?source=test`, { redirect: 'manual' });
+    assert.equal(response.status, 308);
+    assert.equal(response.headers.get('location'), `/${alias.startsWith('/lv/') ? 'lv' : 'en'}/mcp?source=test`);
+  }
+  for (const route of ['/', '/en/', '/lv/mcp', '/en/mcp']) {
     const html = await (await fetch(`${address}${route}`)).text();
-    const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((match) => match[1]);
+    const assets = [...html.matchAll(/(?:src|href)="(\/mcp-site\/assets\/[^"]+)"/g)].map((match) => match[1]);
     assert.ok(assets.length >= 2);
     for (const asset of assets) {
       const response = await fetch(`${address}${asset}`);
@@ -174,4 +198,80 @@ test('language aliases redirect and generated asset links resolve', async () => 
       assert.match(response.headers.get('cache-control'), /immutable/);
     }
   }
+});
+
+test('real HTTP proxy preserves production pages, scoped files and unrelated host routes', async () => {
+  const proxy = createMcpPageProxy({ upstreamOrigin: address });
+  const host = createHttpServer(async (req, res) => {
+    if (await proxy(req, res)) return;
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Existing ABCDE website');
+  });
+  await new Promise((resolve) => host.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${host.address().port}`;
+  try {
+    for (const lang of ['lv', 'en']) {
+      const response = await fetch(`${origin}/${lang}/mcp`);
+      assert.equal(response.status, 200);
+      const html = await response.text();
+      assert.ok(html.includes(`lang="${lang}"`));
+      assert.ok(html.includes('https://abcde-mcp.replit.app/mcp'));
+      const assets = [...html.matchAll(/(?:src|href)="(\/mcp-site\/[^"]+)"/g)].map((m) => m[1]);
+      for (const asset of assets) assert.equal((await fetch(`${origin}${asset}`)).status, 200, asset);
+      const alias = await fetch(`${origin}/${lang}/mcp/`, { redirect: 'manual' });
+      assert.equal(alias.status, 308);
+      assert.equal(alias.headers.get('location'), `/${lang}/mcp`);
+      assert.equal((await fetch(`${origin}/mcp-site/content/${lang}.md`)).status, 200);
+    }
+    for (const route of ['/', '/lv/products', '/en/products', '/api/stats', '/assets/main.js', '/robots.txt', '/llms.txt', '/sitemap.xml', '/mcp']) {
+      assert.equal(await (await fetch(`${origin}${route}`)).text(), 'Existing ABCDE website', route);
+    }
+    for (const route of ['/mcp-site/content/missing.md', '/mcp-site/assets/missing.js', '/mcp-site/%2e%2e%2fapi/stats']) {
+      assert.equal((await fetch(`${origin}${route}`)).status, 404, route);
+    }
+    assert.equal((await fetch(`${origin}/en/mcp`, { method: 'POST' })).status, 405);
+    assert.equal((await fetch(`${origin}/mcp-site/content/en.md`, { method: 'HEAD' })).status, 200);
+  } finally { await new Promise((resolve) => host.close(resolve)); }
+});
+
+test('scoped statistics preserve real counters, omit browser credentials and fail explicitly', async () => {
+  let available = true, leaked = false;
+  const stats = createHttpServer((req, res) => {
+    leaked ||= Boolean(req.headers.cookie || req.headers.authorization);
+    assert.equal(req.url, '/api/stats');
+    res.writeHead(available ? 200 : 503, { 'Content-Type': 'application/json' });
+    res.end(available ? '{"toolCalls":127,"measuredSessions":null,"sessionMeasurementAvailable":false}' : '{"error":"Unavailable"}');
+  });
+  await new Promise((resolve) => stats.listen(0, '127.0.0.1', resolve));
+  const landing = createProductionServer({ statsUrl: `http://127.0.0.1:${stats.address().port}/api/stats` });
+  await new Promise((resolve) => landing.listen(0, '127.0.0.1', resolve));
+  const proxy = createMcpPageProxy({ upstreamOrigin: `http://127.0.0.1:${landing.address().port}` });
+  const host = createHttpServer((req, res) => proxy(req, res));
+  await new Promise((resolve) => host.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${host.address().port}/mcp-site/stats`;
+  try {
+    const response = await fetch(url, { headers: { Cookie: 'test=private', Authorization: 'Bearer test-fixture' } });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal((await response.json()).toolCalls, 127);
+    assert.equal(leaked, false);
+    available = false;
+    const failure = await fetch(url);
+    assert.equal(failure.status, 503);
+    assert.equal((await failure.json()).error, 'Statistics unavailable');
+    assert.equal((await fetch(url, { method: 'HEAD' })).status, 503);
+  } finally {
+    for (const server of [host, landing, stats]) await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('proxy outage is a bounded 502, not successful HTML or invented statistics', async () => {
+  const proxy = createMcpPageProxy({ upstreamOrigin: 'http://127.0.0.1:1' });
+  const host = createHttpServer((req, res) => proxy(req, res));
+  await new Promise((resolve) => host.listen(0, '127.0.0.1', resolve));
+  try {
+    const response = await fetch(`http://127.0.0.1:${host.address().port}/lv/mcp`);
+    assert.equal(response.status, 502);
+    assert.match(await response.text(), /unavailable/);
+  } finally { await new Promise((resolve) => host.close(resolve)); }
 });

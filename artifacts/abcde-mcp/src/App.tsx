@@ -8,19 +8,25 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { copyPrompts, translations, type Language } from './page-content';
-import { sitePath, verifiedMcpEndpoint } from './site-config';
+import { contentNamespace, languagePaths, sitePath, verifiedMcpEndpoint } from './site-config';
+import { fetchIntegratedStats } from './public-stats';
 
 const queryClient = new QueryClient();
-function Home({ language }: { language: Language }) {
+function Home({ language, integrated = false }: { language: Language; integrated?: boolean }) {
   const [mounted, setMounted] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState<number | null>(null);
+  const base = import.meta.env.BASE_URL;
   const { data: stats, isLoading, isError } = useGetPublicStats({
-    query: { queryKey: getGetPublicStatsQueryKey(), refetchInterval: 30_000, enabled: mounted },
+    query: {
+      queryKey: integrated ? [sitePath(base, `${contentNamespace}stats`)] : getGetPublicStatsQueryKey(),
+      ...(integrated ? { queryFn: ({ signal }) => fetchIntegratedStats(base, signal) } : {}),
+      refetchInterval: 30_000, enabled: mounted,
+    },
   });
   const content = translations[language];
   const endpoint = verifiedMcpEndpoint;
-  const base = import.meta.env.BASE_URL;
+  const languageLink = (lang: Language) => sitePath(base, integrated ? languagePaths[lang] : lang === 'en' ? 'en/' : '');
 
   useEffect(() => {
     setMounted(true);
@@ -63,8 +69,8 @@ function Home({ language }: { language: Language }) {
           <span className="brand-name">ABCDE <span className="brand-note">MCP</span></span>
         </a>
         <div className="language-switch" role="group" aria-label={content.langLabel} data-testid="control-language">
-          <a href={sitePath(base)} hrefLang="lv" lang="lv" aria-current={language === 'lv' ? 'page' : undefined} data-testid="button-language-lv">LV</a>
-          <a href={sitePath(base, 'en/')} hrefLang="en" lang="en" aria-current={language === 'en' ? 'page' : undefined} data-testid="button-language-en">EN</a>
+          <a href={languageLink('lv')} hrefLang="lv" lang="lv" aria-current={language === 'lv' ? 'page' : undefined} data-testid="button-language-lv">LV</a>
+          <a href={languageLink('en')} hrefLang="en" lang="en" aria-current={language === 'en' ? 'page' : undefined} data-testid="button-language-en">EN</a>
         </div>
       </header>
 
@@ -227,8 +233,8 @@ function Home({ language }: { language: Language }) {
           <p>{content.footer} · <a href="https://abcde.lv" target="_blank" rel="noreferrer" data-testid="link-abcde">abcde.lv</a></p>
           <div className="footer-tag">
             <span>{content.footerTag}</span>
-            {' · '}<a href={sitePath(base, `content/${language}.md`)}>{language === 'lv' ? 'Saturs Markdown formātā' : 'Content as Markdown'}</a>
-            {' · '}<a href={sitePath(base, 'llms.txt')}>llms.txt</a>
+            {' · '}<a href={sitePath(base, `${contentNamespace}content/${language}.md`)}>{language === 'lv' ? 'Saturs Markdown formātā' : 'Content as Markdown'}</a>
+            {' · '}<a href={sitePath(base, `${contentNamespace}llms.txt`)}>llms.txt</a>
           </div>
         </div>
       </footer>
@@ -241,6 +247,8 @@ function Router() {
   return (
     <RoutedErrorBoundary>
       <Switch>
+        <Route path="/lv/mcp"><Home language="lv" integrated /></Route>
+        <Route path="/en/mcp"><Home language="en" integrated /></Route>
         <Route path="/"><Home language="lv" /></Route>
         <Route path="/en"><Home language="en" /></Route>
         <Route path="/en/"><Home language="en" /></Route>

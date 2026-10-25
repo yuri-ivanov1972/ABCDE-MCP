@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { pageRoute } from './page-routes.mjs';
+import { serveStats } from './stats-response.mjs';
 
 // Development serves exactly the same renderer and documents as the build.
 export function agentPages() {
@@ -13,19 +15,27 @@ export function agentPages() {
         const pathname = (req.url ?? '/').split('?')[0];
         if (!pathname.startsWith(base)) return next();
         const relative = pathname.slice(base.length);
-        if (['en', 'index.html', 'en/index.html'].includes(relative)) {
-          res.writeHead(308, { Location: `${base}${relative.startsWith('en') ? 'en/' : ''}` });
+        const route = pageRoute(relative);
+        if (route.redirect !== undefined) {
+          const query = (req.url ?? '').includes('?') ? `?${req.url.split('?').slice(1).join('?')}` : '';
+          res.writeHead(308, { Location: `${base}${route.redirect}${query}` });
           return res.end();
         }
         try {
-          if (relative === '' || relative === 'en/') {
+          if (relative === 'mcp-site/stats') return serveStats(req, res);
+          if (relative === 'mcp-site/favicon.svg') {
+            const icon = await readFile(path.join(server.config.root, 'public/favicon.svg'));
+            res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+            return res.end(req.method === 'HEAD' ? undefined : icon);
+          }
+          if (route.file) {
             const template = await readFile(path.join(server.config.root, 'index.html'), 'utf8');
             const transformed = await server.transformIndexHtml(pathname, template);
             const renderer = await server.ssrLoadModule('/src/entry-server.tsx');
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
             return res.end(req.method === 'HEAD' ? undefined : renderer.renderPage(transformed, pathname));
           }
-          if (/^(?:content\/|llms|robots|sitemap)/.test(relative) || /\.(?:md|txt|xml)$/.test(relative)) {
+          if (/^(?:mcp-site\/|content\/|llms|robots|sitemap)/.test(relative) || /\.(?:md|txt|xml)$/.test(relative)) {
             const renderer = await server.ssrLoadModule('/src/entry-server.tsx');
             const document = renderer.agentDocuments()[relative];
             res.writeHead(document ? 200 : 404, {

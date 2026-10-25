@@ -1,5 +1,5 @@
 import { build, createServer } from 'vite';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +10,8 @@ const server = await createServer({ root, mode: 'production', server: { middlewa
 try {
   const renderer = await server.ssrLoadModule('/src/entry-server.tsx');
   const directory = path.join(root, 'dist/public');
+  await mkdir(path.join(directory, 'mcp-site'), { recursive: true });
+  await copyFile(path.join(root, 'public/favicon.svg'), path.join(directory, 'mcp-site/favicon.svg'));
   const template = await readFile(path.join(directory, 'index.html'), 'utf8');
   for (const route of renderer.pageRoutes) {
     const destination = path.join(directory, route, 'index.html');
