@@ -64,7 +64,7 @@ function Home({ language, integrated = false }: { language: Language; integrated
   return (
     <main className="site-shell" data-testid="page-landing">
       <header className="topbar" data-testid="section-header">
-        <a className="brand" href="#top" aria-label="ABCDE MCP home" data-testid="link-home">
+        <a className="brand" href="https://abcde.lv" aria-label={language === 'lv' ? 'ABCDE.lv sākumlapa' : 'ABCDE.lv home'} data-testid="link-home">
           <img className="brand-logo" src={sitePath(base, 'mcp-site/assets/nutri-score-logo-354d7707378f.png')} alt="" width={300} height={157} />
           <span className="brand-divider" aria-hidden="true" />
           <span className="brand-name">ABCDE <span className="brand-badge">MCP</span></span>

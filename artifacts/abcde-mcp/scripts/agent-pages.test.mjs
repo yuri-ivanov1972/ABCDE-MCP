@@ -82,6 +82,15 @@ for (const [language, route] of [['lv', '/'], ['en', '/en/'], ['lv', '/lv/mcp'],
     }
     assert.equal(html.includes('.replit.dev'), false);
   });
+
+  test(`${route}: header logo links to ABCDE.lv in the same tab`, () => {
+    const html = renderer.renderPage(template, route);
+    const link = html.match(/<a\b[^>]*data-testid="link-home"[^>]*>/)?.[0];
+    assert.ok(link, 'Header brand link exists');
+    assert.match(link, /href="https:\/\/abcde\.lv"/);
+    assert.ok(link.includes(`aria-label="${language === 'lv' ? 'ABCDE.lv sākumlapa' : 'ABCDE.lv home'}"`));
+    assert.doesNotMatch(link, /\btarget=|\btabindex="-1"/i);
+  });
 }
 
 test('language URLs determine content, independent of a saved preference', () => {
