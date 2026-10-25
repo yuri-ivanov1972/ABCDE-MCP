@@ -135,3 +135,25 @@ For a published release, pass its actual `/mcp` URL to `test:protocol`, then per
 - No publishing occurred. This workspace does not contain the separate abcde.lv website and has not changed its routing, CSP, discovery files or deployment.
 - `ABCDE-LV-HANDOFF.md` specifies narrow forwarding, staged publication, framework inspection and public checks. Its adjacent `abcde-page-proxy.mjs` is a tested Node reference, not a claim that abcde.lv uses Node request/response middleware.
 - Publish this MCP project first, check the upstream paths, then apply and verify the handoff in the main website project before publishing that project. Public URLs and main-site CSP/service-worker compatibility remain unverified until those steps are performed.
+
+## Main-site branding alignment — 2026-10-25
+
+- Reused the actual logo and self-contained SVG favicon from abcde.lv. The local
+  production/proxy regression verifies their byte hashes and MIME/HEAD responses.
+- Verified the main site's primary color (`hsl(147 62% 30%)`) and system sans
+  typography from live HTML/CSS. Applied its white/light-gray surfaces, dark text,
+  green controls, restrained borders and rounded cards to both language pages.
+- Removed Google Fonts dependencies from HTML and CSS. Brand files stay within
+  existing `/mcp-site/` forwarding paths; no proxy allowlist expansion is needed.
+- Landing typecheck, production build and all **19 regression tests passed**.
+  The existing nonfatal tooltip sourcemap warning remains.
+- Chromium against built production files through the local host proxy passed:
+  both no-JavaScript language pages and real logo loading, system typography,
+  hydration, navigation/reload, real local API counters, endpoint and prompt
+  clipboard contents, announcements, and mobile overflow checks.
+- Inspected desktop Latvian (1280 px) and mobile English (390 px) screenshots;
+  branding and layouts rendered correctly with no fresh browser errors. The
+  managed web workflow restarted cleanly.
+- Existing content, metadata, AI documents, connector endpoint and MCP/backend
+  behavior remain unchanged. This update has not been published; no changes
+  were made to the separate abcde.lv project.

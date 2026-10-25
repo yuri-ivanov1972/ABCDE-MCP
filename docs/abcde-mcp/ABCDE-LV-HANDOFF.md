@@ -70,9 +70,11 @@ Do not copy upstream Set-Cookie, hop-by-hop headers or mismatched compressed
 Content-Length. The reference buffers a bounded 4 MiB response and times out
 after 10 seconds. Static assets are immutable; HTML/text documents revalidate.
 
-Check the main site's CSP: these pages use same-origin JavaScript/CSS, Google
-Fonts (`fonts.googleapis.com` and `fonts.gstatic.com`) and same-origin
-`/mcp-site/stats` fetches. Add only the necessary allowances for these routes,
+Check the main site's CSP: these pages use same-origin JavaScript/CSS, images
+and `/mcp-site/stats` fetches. They use system fonts, with no Google Fonts
+requests. The real abcde.lv logo is bundled under `/mcp-site/assets/` and its
+self-contained favicon is served at `/mcp-site/favicon.svg`; no extra proxy
+routes or main-site root asset overrides are needed. Add only necessary allowances,
 without weakening policies for the rest of the site. Check any service worker
 does not intercept the MCP pages or scoped resources with unrelated cached HTML.
 If any existing route already occupies `/mcp-site/`, stop and reconcile it rather

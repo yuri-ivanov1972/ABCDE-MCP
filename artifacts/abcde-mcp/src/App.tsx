@@ -65,8 +65,9 @@ function Home({ language, integrated = false }: { language: Language; integrated
     <main className="site-shell" data-testid="page-landing">
       <header className="topbar" data-testid="section-header">
         <a className="brand" href="#top" aria-label="ABCDE MCP home" data-testid="link-home">
-          <span className="brand-mark" aria-hidden="true">abc</span>
-          <span className="brand-name">ABCDE <span className="brand-note">MCP</span></span>
+          <img className="brand-logo" src={sitePath(base, 'mcp-site/assets/nutri-score-logo-354d7707378f.png')} alt="" width={300} height={157} />
+          <span className="brand-divider" aria-hidden="true" />
+          <span className="brand-name">ABCDE <span className="brand-badge">MCP</span></span>
         </a>
         <div className="language-switch" role="group" aria-label={content.langLabel} data-testid="control-language">
           <a href={languageLink('lv')} hrefLang="lv" lang="lv" aria-current={language === 'lv' ? 'page' : undefined} data-testid="button-language-lv">LV</a>
@@ -85,11 +86,13 @@ function Home({ language, integrated = false }: { language: Language; integrated
           </div>
         </div>
         <div className="hero-visual" aria-label="Illustration of food data connected to Rimi and Maxima" role="img" data-testid="visual-food-data">
-          <div className="visual-orbit">
-            <span className="orbit-label label-rimi">Rimi</span>
-            <span className="orbit-label label-maxima">Maxima</span>
-            <span className="orbit-label label-nutrition">Nutrition data</span>
-            <div className="food-sun"><div className="visual-center">ABCDE</div></div>
+          <div className="visual-panel">
+            <div className="visual-row"><span className="visual-dot" />Rimi</div>
+            <div className="visual-row"><span className="visual-dot" />Maxima</div>
+            <div className="visual-row"><span className="visual-dot" />Nutrition data</div>
+            <div className="visual-link" aria-hidden="true" />
+            <div className="visual-center"><span>ABCDE</span><span className="brand-badge">MCP</span></div>
+            <div className="visual-meta"><code>read-only</code><code>Claude</code></div>
           </div>
           <span className="visual-caption">{content.visualCaption}</span>
         </div>
@@ -205,7 +208,7 @@ function Home({ language, integrated = false }: { language: Language; integrated
               <div className="section-kicker">{content.usageKicker}</div>
               <h2 className="section-title">{content.usageTitle}</h2>
             </div>
-            <Leaf size={26} strokeWidth={1.5} color="#477756" aria-hidden="true" />
+            <Leaf size={26} strokeWidth={1.5} color="hsl(147 62% 30%)" aria-hidden="true" />
           </div>
           <div className="usage-grid" aria-live="polite" data-testid="status-public-stats">
             <div className="usage-stat">

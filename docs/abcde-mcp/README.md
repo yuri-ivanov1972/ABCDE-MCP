@@ -30,6 +30,13 @@ Catalogue requests currently need no API key. Do not add `ABCDE_API_KEY`, `RIMI_
 
 ## Architecture and routes
 
+The landing page reuses the main website's actual Nutri-Score logo and
+self-contained SVG favicon, retrieved from `https://abcde.lv/nutri-score-logo.png`
+and `https://abcde.lv/favicon.svg`. Its colors and system typography follow the
+main site's CSS. These small brand assets are bundled locally: the content-hashed
+logo lives under `/mcp-site/assets/` and the favicon under `/mcp-site/favicon.svg`.
+No Google Fonts requests or extra main-site proxy routes are required.
+
 - `/` — Latvian landing page, with complete HTML before JavaScript.
 - `/en/` — English landing page; `/en` redirects here. The language switch uses normal links and works without JavaScript. Explicit language URLs take precedence over the browser's stored preference; the current selection is still recorded locally.
 - `/lv/mcp`, `/en/mcp` — integration-ready language pages for `https://abcde.lv/lv/mcp` and `https://abcde.lv/en/mcp`. Their language links stay on those paths; trailing-slash aliases redirect to the no-slash address.

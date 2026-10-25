@@ -28,6 +28,11 @@ export function agentPages() {
             res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
             return res.end(req.method === 'HEAD' ? undefined : icon);
           }
+          if (relative === 'mcp-site/assets/nutri-score-logo-354d7707378f.png') {
+            const logo = await readFile(path.join(server.config.root, 'public', relative));
+            res.writeHead(200, { 'Content-Type': 'image/png' });
+            return res.end(req.method === 'HEAD' ? undefined : logo);
+          }
           if (route.file) {
             const template = await readFile(path.join(server.config.root, 'index.html'), 'utf8');
             const transformed = await server.transformIndexHtml(pathname, template);

@@ -96,8 +96,12 @@ try {
     assert.equal(await evaluate("document.querySelectorAll('[data-testid^=\"text-limitation-\"]').length"), 6);
     assert.ok(await evaluate("!!document.querySelector('a[href=\"/mcp-site/content/" + language + ".md\"]')"));
     await waitFor("getComputedStyle(document.body).margin === '0px'");
+    await waitFor("document.querySelector('.brand-logo')?.complete && document.querySelector('.brand-logo')?.naturalWidth === 300");
+    assert.equal(await evaluate("getComputedStyle(document.body).backgroundColor"), 'rgb(255, 255, 255)');
+    assert.match(await evaluate("getComputedStyle(document.body).fontFamily"), /system-ui/);
+    assert.equal(await evaluate("!!document.querySelector('link[href*=\"fonts.googleapis.com\"]')"), false);
   }
-  console.log('PASS JavaScript disabled: both full language pages, instructions, limitations, CSS and Markdown links');
+  console.log('PASS JavaScript disabled: both full language pages, real logo, system fonts, CSS and Markdown links');
 
   await send('Emulation.setScriptExecutionDisabled', { value: false }, session);
   await navigate(lvRoute, 'lv');

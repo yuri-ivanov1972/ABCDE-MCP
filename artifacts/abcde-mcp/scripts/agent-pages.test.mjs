@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createProductionServer } from './serve.mjs';
 import { createServer as createHttpServer } from 'node:http';
 import { createMcpPageProxy } from '../../../docs/abcde-mcp/abcde-page-proxy.mjs';
+import { createHash } from 'node:crypto';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let vite, renderer, content, config, template, production, address;
@@ -89,6 +90,37 @@ test('language URLs determine content, independent of a saved preference', () =>
     assert.match(renderer.renderPage(template, '/'), /<html lang="lv"/);
     assert.match(renderer.renderPage(template, '/en/'), /<html lang="en"/);
   } finally { delete globalThis.localStorage; }
+});
+
+test('main-site branding is local, byte-verified and available through scoped proxy paths', async () => {
+  const logoPath = '/mcp-site/assets/nutri-score-logo-354d7707378f.png';
+  const proxy = createMcpPageProxy({ upstreamOrigin: address });
+  const host = createHttpServer((req, res) => proxy(req, res));
+  await new Promise((resolve) => host.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${host.address().port}`;
+  try {
+    for (const route of ['/', '/en/', '/lv/mcp', '/en/mcp']) {
+      const html = renderer.renderPage(template, route);
+      assert.ok(html.includes(`src="${logoPath}"`));
+      assert.ok(html.includes('href="/mcp-site/favicon.svg"'));
+      assert.equal(html.includes('fonts.googleapis.com'), false);
+    }
+    for (const [resource, type, hash] of [
+      [logoPath, 'image/png', '354d7707378f0f173724a08dada63fa2f837f1687190701872396e14530217d0'],
+      ['/mcp-site/favicon.svg', 'image/svg+xml', '42ee8f8cf9722afd994ff096392ea8ce02b4fa5be62686f9127744e0795df2d6'],
+    ]) {
+      const response = await fetch(`${origin}${resource}`);
+      assert.equal(response.status, 200);
+      assert.ok(response.headers.get('content-type').startsWith(type));
+      const bytes = Buffer.from(await response.arrayBuffer());
+      assert.equal(createHash('sha256').update(bytes).digest('hex'), hash);
+      const head = await fetch(`${origin}${resource}`, { method: 'HEAD' });
+      assert.equal(head.status, 200);
+      assert.equal(await head.text(), '');
+    }
+    const css = await readFile(path.join(root, 'src/index.css'), 'utf8');
+    assert.equal(/fonts\.googleapis|DM Sans|Manrope|Space Mono/.test(css), false);
+  } finally { await new Promise((resolve) => host.close(resolve)); }
 });
 
 test('agent documents contain shared content, not snapshots or unsupported promises', () => {
