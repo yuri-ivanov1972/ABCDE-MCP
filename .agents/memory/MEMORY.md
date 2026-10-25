@@ -2,3 +2,4 @@
 - [MCP text compatibility](mcp-client-text-compatibility.md) — real Claude exposed summaries but not structured product data; verify complete text-only consumption, not just SDK success.
 - [FODMAP scope](fodmap-screening-boundaries.md) — ingredient screening is not a lab-verified rating; no-listed-concern must not become a low-FODMAP safety or portion claim.
 - [Agent-readable content](agent-readable-content.md) — preserve initial HTML and shared text; missing documents must not become successful HTML app responses.
+- [Landing page branding](landing-page-branding.md) — owner wants the MCP page to use abcde.lv's logo, favicon, styles and colors.
