@@ -9,6 +9,7 @@ import {
 } from "./metrics";
 import { withMcpRequestContext } from "./request-context";
 import { createMcpServer } from "./server";
+import { configuredMcpHosts } from "./host-policy";
 
 const recognizedTools = new Set([
   "search_products",
@@ -16,30 +17,7 @@ const recognizedTools = new Set([
   "build_basket",
 ]);
 
-function hostFromUrl(value: string | undefined): string | null {
-  if (!value) return null;
-  try {
-    return new URL(value).hostname;
-  } catch {
-    return null;
-  }
-}
-
-function configuredHosts(): string[] {
-  const hosts = new Set(["localhost", "127.0.0.1", "::1"]);
-  for (const item of (process.env.REPLIT_DOMAINS ?? "").split(",")) {
-    const host = item.trim().split(":")[0];
-    if (host) hosts.add(host);
-  }
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    hosts.add(process.env.REPLIT_DEV_DOMAIN.trim());
-  }
-  const publicHost = hostFromUrl(process.env.PUBLIC_MCP_URL);
-  if (publicHost) hosts.add(publicHost);
-  return [...hosts];
-}
-
-const hosts = configuredHosts();
+const hosts = configuredMcpHosts(process.env);
 const mcpApp = createMcpExpressApp({
   host: "0.0.0.0",
   allowedHosts: hosts,

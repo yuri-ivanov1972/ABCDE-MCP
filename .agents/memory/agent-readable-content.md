@@ -21,6 +21,17 @@ The owner wants `https://abcde.lv/mcp` as the primary Claude connection address,
 
 **How to apply:** Keep displayed instructions, clipboard output and generated documents aligned. Verify a real MCP route on the main domain before promoting it in public instructions; ordinary successful HTML is not proof of MCP support. Retain backward compatibility for existing Claude connections.
 
+Keep the machine-endpoint proxy separate from the human-page proxy, and keep
+dual-host server trust independent of which address is advertised.
+
+**Why:** The existing human proxy buffers GET/HEAD content with a short timeout;
+MCP needs raw POST protocol bytes, progressive JSON/SSE, longer tool deadlines
+and disconnect cancellation. Promoting instructions must not retire old clients.
+
+**How to apply:** Mount exact machine routing before body parsers and website
+fallback. Do not broaden the human proxy, trust arbitrary forwarded hosts,
+rewrite proxied HTML strings or use an MCP redirect as the migration mechanism.
+
 The owner selected `https://abcde.lv/lv/mcp` and `https://abcde.lv/en/mcp` for the human pages. The owner controls abcde.lv in a separate Replit project.
 
 **Why:** Language-prefixed paths fit the owner's main website; this does not move the Claude endpoint.

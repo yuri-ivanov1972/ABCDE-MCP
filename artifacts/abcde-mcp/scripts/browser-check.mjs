@@ -1,6 +1,6 @@
 // Uses the workspace Chromium directly, with no extra browser package or test service.
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -12,6 +12,7 @@ let origin = process.argv.find((arg, index) => index > 1 && !arg.startsWith('--'
 const integrated = process.argv.includes('--integrated') || process.argv.includes('--production-integration');
 const lvRoute = integrated ? '/lv/mcp' : '/';
 const enRoute = integrated ? '/en/mcp' : '/en/';
+const expectedEndpoint = JSON.parse(await readFile(new URL('../src/connection.json', import.meta.url), 'utf8')).primaryEndpoint;
 const servers = [];
 if (process.argv.includes('--production-integration')) {
   const upstream = createProductionServer();
@@ -120,7 +121,7 @@ try {
   });
   await send('Page.bringToFront', {}, session);
   const endpoint = await evaluate("document.querySelector('[data-testid=text-public-endpoint]').textContent");
-  assert.equal(endpoint, 'https://abcde-mcp.replit.app/mcp');
+  assert.equal(endpoint, expectedEndpoint);
   await evaluate("document.querySelector('[data-testid=button-copy-endpoint]').click()");
   await waitFor('document.querySelector("[data-testid=status-copy-announcement]").textContent === "Copied"');
   assert.equal(await evaluate('navigator.clipboard.readText()'), endpoint);

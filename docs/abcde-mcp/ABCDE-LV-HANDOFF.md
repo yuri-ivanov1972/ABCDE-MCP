@@ -5,7 +5,9 @@
 This is a handoff for the **separate Replit project serving abcde.lv**. Its code
 and hosting framework are not in this workspace. Local support and the reference
 proxy have been implemented here; the abcde.lv project has not been changed and
-the new public URLs are **not verified live**.
+the original integration is separate from changes to this workspace. The owner
+subsequently confirmed both human pages are live. Preserve them when following
+the newer [Claude endpoint migration handoff](CLAUDE-ENDPOINT-HANDOFF.md).
 
 Inspect that project's framework, server entry point, existing routes, language
 routing, content security policy and hosting model before editing it. Do not
@@ -24,6 +26,8 @@ Keep all existing pages and APIs intact.
 Use a **server-side proxy**, not an iframe or client-side redirect, so visitors
 and AI readers receive full HTML at the abcde.lv address before JavaScript.
 Do not move the domain or forward `/mcp` on abcde.lv as a side effect.
+The separately approved machine-endpoint migration adds exact `/mcp` through its
+own streaming proxy; it must not broaden or reuse this human-page proxy.
 
 ## Exact routing contract
 

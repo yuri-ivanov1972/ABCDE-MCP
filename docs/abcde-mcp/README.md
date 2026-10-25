@@ -23,10 +23,24 @@ The API service is started by its configured Replit workflow. The landing page i
 | --- | --- | --- |
 | `ABCDE_API_URL` | Fixed server-side ABCDE.lv API base URL | `https://abcde.lv/api` |
 | `PUBLIC_MCP_URL` | Optional public connector address for host validation | Unset until a real published URL is known |
-| `VITE_PUBLIC_MCP_URL` | Legacy setting; ignored by the landing page and agent documents | Connection instructions always use `https://abcde-mcp.replit.app/mcp` from the shared site configuration |
+| `VITE_PUBLIC_MCP_URL` | Legacy setting; ignored by the landing page and agent documents | Advertised address comes from the allowlisted `src/connection.json` build-time setting |
 | `DATABASE_URL` | This project's managed PostgreSQL database | Provided by Replit |
 
 Catalogue requests currently need no API key. Do not add `ABCDE_API_KEY`, `RIMI_DATABASE_URL`, or `MAXIMA_DATABASE_URL` unless the upstream contract changes and the project owner separately approves it. `PUBLIC_MCP_URL` and `VITE_PUBLIC_MCP_URL` are ordinary configuration values, not secrets. Never put catalogue credentials or database credentials into this project.
+
+The MCP host policy explicitly retains both `abcde.lv` and
+`abcde-mcp.replit.app`, independently of the advertised address. It never trusts
+request-provided forwarded hosts. The landing page currently advertises the
+working direct endpoint; after the main-domain machine route is verified,
+promote `artifacts/abcde-mcp/src/connection.json` to `https://abcde.lv/mcp` and
+rebuild. Only the two owner-approved endpoint strings are accepted; obsolete
+environment overrides cannot change clipboard or AI-readable instructions.
+
+See [the Claude endpoint migration handoff](CLAUDE-ENDPOINT-HANDOFF.md) and its
+[dedicated streaming MCP proxy](abcde-mcp-proxy.mjs). That machine proxy is
+separate from the human-page proxy and must run before body parsers. The new
+main-domain endpoint is not claimed live until the other project publishes and
+actual public MCP/Claude checks pass. Neither connector address is retired.
 
 ## Architecture and routes
 

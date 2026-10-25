@@ -1,5 +1,47 @@
 # Verification record
 
+## Main-domain Claude endpoint preparation — 25 October 2026
+
+**Local readiness verified; no public cutover or publication performed.**
+
+- API and landing-page TypeScript checks passed.
+- API build/start passed through its managed workflow; landing-page production
+  build passed. Both managed workflows restarted and are serving requests.
+- 55 backend unit tests passed, including explicit dual-public-host and
+  untrusted Host/Origin rejection checks.
+- 9 dedicated machine-proxy tests passed: exact route isolation, raw bytes and
+  MCP headers, stripped credentials, Host/Origin checks, preflight, input limits,
+  progressive SSE before upstream completion, disconnect cancellation, method
+  and error statuses, no-store, rejected redirects/HTML, response size and
+  stalled-request limits, and explicit rejection of post-parser mounting.
+- 20 human-page/agent-document tests passed. A separately configured renderer
+  verified promotion to the main-domain address in both HTML languages and all
+  relevant text documents; invalid advertised addresses fail explicitly.
+- The official MCP client checked the real running development backend directly
+  and through the new proxy reference, using both legacy and automatic modern
+  negotiation. Exactly three read-only tools were listed. All three tools were
+  called through the proxy in both modes; complete JSON text matched
+  structuredContent, including names and store-qualified product IDs.
+- Actual direct/proxy calls with the main-site Origin passed; unknown origins
+  were rejected. Notifications returned 202 and stateless GET/DELETE returned
+  SDK 405, without successful HTML fallback.
+- The built landing pages passed the existing direct Chromium check through the
+  human-page proxy contract: JavaScript-disabled HTML, hydration/navigation,
+  statistics, actual clipboard text, scoped assets and 390 px overflow.
+- A fresh development preview screenshot showed the branded Latvian page with
+  no fresh application errors.
+
+The advertised setting intentionally remains
+https://abcde-mcp.replit.app/mcp. No code or routing was changed in the separate
+abcde.lv project. Deployment metadata confirms the existing upstream URL, not
+publication of this implementation.
+
+Follow `CLAUDE-ENDPOINT-HANDOFF.md`: publish upstream support, implement/publish
+the main-site exact machine route with owner approval, verify actual public MCP
+on both addresses and a real Claude connection, then promote the shared
+advertised address and republish. Public gateway behavior, sustained concurrent
+slow-reader load and main-domain real-Claude acceptance remain unverified here.
+
 Initial development baseline checked on 2026-10-24. The owner subsequently published the project. The later production diagnosis and development-only compatibility fix are recorded below; this record does not claim the fix has been published.
 
 ## Initial development baseline — passed

@@ -9,6 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node test.mjs",
+    "test:proxy": "node --test ../../docs/abcde-mcp/abcde-mcp-proxy.test.mjs",
+    "test:proxy-protocol": "node proxy-protocol-check.mjs",
     "test:protocol": "node protocol-check.mjs"
   },
   "dependencies": {

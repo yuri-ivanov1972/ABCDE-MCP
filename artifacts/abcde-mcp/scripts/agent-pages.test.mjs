@@ -1,6 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
@@ -19,7 +20,7 @@ before(async () => {
     define: { 'import.meta.env.VITE_PUBLIC_MCP_URL': JSON.stringify('https://obsolete.example/mcp') },
     resolve: { alias: { '@': path.join(root, 'src') } },
     ssr: { noExternal: ['@workspace/api-client-react'] },
-    server: { middlewareMode: true, hmr: false, watch: null },
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     appType: 'custom',
   });
   renderer = await vite.ssrLoadModule('/src/entry-server.tsx');
@@ -159,6 +160,41 @@ test('the real connection address wins over obsolete configuration everywhere', 
   const app = await readFile(path.join(root, 'src/App.tsx'), 'utf8');
   assert.match(app, /const endpoint = verifiedMcpEndpoint;/);
   assert.match(app, /onClick=\{\(\) => copyText\(endpoint,/);
+});
+
+test('promotion uses one validated setting for both HTML languages and all agent documents', async () => {
+  assert.equal(config.selectPrimaryEndpoint('https://abcde.lv/mcp'), 'https://abcde.lv/mcp');
+  for (const value of ['', null, 'https://evil.example/mcp', 'https://abcde.lv/mcp/',
+    'http://abcde.lv/mcp', 'https://abcde.lv/mcp?key=x']) {
+    assert.throws(() => config.selectPrimaryEndpoint(value));
+  }
+  const directory = await mkdtemp(path.join(tmpdir(), 'abcde-connection-test-'));
+  const fixture = path.join(directory, 'connection.json');
+  let promoted;
+  try {
+    await writeFile(fixture, '{"primaryEndpoint":"https://abcde.lv/mcp"}');
+    promoted = await createServer({
+      configFile: false, root, base: '/', plugins: [react()],
+      resolve: { alias: { '@': path.join(root, 'src'), './connection.json': fixture } },
+      ssr: { noExternal: ['@workspace/api-client-react'] },
+      server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom',
+    });
+    const renderer = await promoted.ssrLoadModule('/src/entry-server.tsx');
+    for (const route of ['/', '/en/', '/lv/mcp', '/en/mcp']) {
+      const html = renderer.renderPage(template, route);
+      assert.ok(html.includes('data-testid="text-public-endpoint">https://abcde.lv/mcp</code>'));
+      assert.equal(html.includes('https://abcde-mcp.replit.app/mcp'), false);
+    }
+    for (const [name, document] of Object.entries(renderer.agentDocuments())) {
+      if (name.endsWith('.md') || name.endsWith('llms.txt')) {
+        assert.ok(document.body.includes('https://abcde.lv/mcp'), name);
+        assert.equal(document.body.includes('https://abcde-mcp.replit.app/mcp'), false);
+      }
+    }
+  } finally {
+    if (promoted) await promoted.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('endpoint configuration rejects private/dev addresses, credentials and query parameters', () => {

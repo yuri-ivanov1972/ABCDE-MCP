@@ -14,3 +14,17 @@ mtime_ms = 1792920921425
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:bb7462aa-9d70-4e93-b9cf-83560b4e2054/1cae7944-3b41-4a7f-b060-927258f8ede5/39986913-88bb-45f4-90ab-8829e10d8720"
 storage_version_token = "1792922804711148"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "gRJcDm_t3geBPhEX34FLE"
+uri = "file://docs/abcde-mcp/CLAUDE-ENDPOINT-HANDOFF.md"
+type = "text"
+title = "ABCDE.lv — Claude connection handoff"
+description = "Implementation instructions, proxy file references, verification commands and safe rollout steps for the abcde.lv project."
+logical_id = "a205ccf2-1ec7-4cb7-af76-6bc277737887"
+content_hash = "sha256:38088fbf11e085194f84d0f3433ac880cd1be7b74e0583bf4eca19587427167d"
+size = 11759
+mtime_ms = 1792926805598
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:bb7462aa-9d70-4e93-b9cf-83560b4e2054/a205ccf2-1ec7-4cb7-af76-6bc277737887/607e5428-db80-497f-9ff4-cfdf125c75f0"
+storage_version_token = "1792926996633179"
+content_type = "text/markdown"
