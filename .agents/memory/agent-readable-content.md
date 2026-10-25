@@ -15,17 +15,23 @@ Avoid restoring a catch-all HTML success response for missing content documents.
 
 **How to apply:** Any hosting or routing change must preserve those response contracts and be checked on the published release separately from development.
 
-Use `https://abcde-mcp.replit.app/mcp` as the authoritative connection address in the webpage and its agent-readable documents.
+The owner wants `https://abcde.lv/mcp` as the primary Claude connection address, while keeping `https://abcde-mcp.replit.app/mcp` working.
 
-**Why:** The owner explicitly requested this real address, rather than a preview URL or configurable substitute.
+**Why:** The owner explicitly requested the main-domain connector address and confirmed that both addresses should keep working. This supersedes the earlier requirement to fix the advertised address to the standalone service.
 
-**How to apply:** Keep displayed instructions, clipboard output and generated documents aligned. Do not restore an environment override without a new owner request.
+**How to apply:** Keep displayed instructions, clipboard output and generated documents aligned. Verify a real MCP route on the main domain before promoting it in public instructions; ordinary successful HTML is not proof of MCP support. Retain backward compatibility for existing Claude connections.
 
 The owner selected `https://abcde.lv/lv/mcp` and `https://abcde.lv/en/mcp` for the human pages. The owner controls abcde.lv in a separate Replit project.
 
 **Why:** Language-prefixed paths fit the owner's main website; this does not move the Claude endpoint.
 
 **How to apply:** Treat the human origin and MCP service origin independently. Support here is not proof of routing or publication in the other project. Preserve that site's existing routes and root discovery files.
+
+The owner confirmed both main-site language pages are live on 25 October 2026.
+
+**Why:** The owner supplied the integration status when discussing the main-domain Claude endpoint.
+
+**How to apply:** Preserve the established human routes while integrating the separate machine endpoint. Do not treat the human-page proxy as an MCP transport proxy.
 
 Do not describe this connector as requiring Claude Pro or Max: the owner states Claude Free supports one MCP connector.
 
